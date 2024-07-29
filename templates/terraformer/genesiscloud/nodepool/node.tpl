@@ -34,7 +34,7 @@ resource "genesiscloud_ssh_key" "{{ $sshKeyResourceName }}" {
               provider = genesiscloud.nodepool_{{ $resourceSuffix }}
               name   = "{{ $volumeName }}"
               region = "{{ $region }}"
-              size   = {{ $nodepool.NodePool.StorageDiskSize}}
+              size   = {{ $nodepool.Details.StorageDiskSize}}
               type   = "hdd"
             }
         {{- end }}
@@ -44,8 +44,8 @@ resource "genesiscloud_ssh_key" "{{ $sshKeyResourceName }}" {
           name   = "{{ $node.Name }}"
           region = "{{ $region }}"
 
-          image_id = data.genesiscloud_images.base_os_{{ $resourceSuffix }}.images[index(data.genesiscloud_images.base_os_{{ $resourceSuffix }}.images.*.name, "{{ $nodepool.NodePool.Image}}")].id
-          type     = "{{ $nodepool.NodePool.ServerType }}"
+          image_id = data.genesiscloud_images.base_os_{{ $resourceSuffix }}.images[index(data.genesiscloud_images.base_os_{{ $resourceSuffix }}.images.*.name, "{{ $nodepool.Details.Image}}")].id
+          type     = "{{ $nodepool.Details.ServerType }}"
 
           public_ip_type = "static"
 
