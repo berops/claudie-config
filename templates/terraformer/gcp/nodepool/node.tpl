@@ -14,7 +14,6 @@
     {{- range $node := $nodepool.Nodes }}
 
         {{- $computeInstanceResourceName  := printf "%s_%s" $node.Name $resourceSuffix }}
-        {{- $computeInstanceName          := printf "snt-%s-%s-%s" $clusterHash $region $nodepool.Name }}
         {{- $computeSubnetResourceName    := printf "%s_%s_subnet" $nodepool.Name $resourceSuffix }}
         {{- $varStorageDiskName           := printf "gcp_storage_disk_name_%s" $resourceSuffix }}
         {{- $isWorkerNodeWithDiskAttached := and (not $nodepool.IsControl) (gt $nodepool.Details.StorageDiskSize 0) }}
