@@ -7,7 +7,7 @@
 {{- $LoadBalancerRoles     := .Data.LBData.Roles }}
 {{- $K8sHasAPIServer       := .Data.K8sData.HasAPIServer }}
 
-{{- range $_, $region := .Regions }}
+{{- range $_, $region := .Data.Regions }}
 
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
 
