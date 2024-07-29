@@ -114,7 +114,8 @@ EOF
 output "{{ $nodepool.Name }}_{{ $uniqueFingerPrint }}" {
   value = {
     {{- range $node := $nodepool.Nodes }}
-    "${genesiscloud_instance.{{ $instanceResourceName }}.name}" = genesiscloud_instance.{{ $instanceResourceName }}.public_ip
+        {{- $instanceResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
+        "${genesiscloud_instance.{{ $instanceResourceName }}.name}" = genesiscloud_instance.{{ $instanceResourceName }}.public_ip
     {{- end }}
   }
 }
