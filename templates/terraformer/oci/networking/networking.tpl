@@ -54,7 +54,7 @@ resource "oci_core_vcn" "{{ $coreVCNResourceName }}" {
 
 resource "oci_core_internet_gateway" "{{ $coreGatewayResourceName }}" {
   provider        = oci.nodepool_{{ $resourceSuffix }}
-  compartment_id  = var.{{ varCompartmentID }}
+  compartment_id  = var.{{ $varCompartmentID }}
   display_name    = "{{ $coreGatewayName }}"
   vcn_id          = oci_core_vcn.{{ $coreVCNResourceName }}.id
   enabled         = true
@@ -70,7 +70,7 @@ resource "oci_core_internet_gateway" "{{ $coreGatewayResourceName }}" {
 
 resource "oci_core_default_security_list" "{{ $coreSecurityListResourceName }}" {
   provider                    = oci.nodepool_{{ $resourceSuffix }}
-  manage_default_resource_id  = oci_core_vcn.{{ coreVCNResourceName }}.default_security_list_id
+  manage_default_resource_id  = oci_core_vcn.{{ $coreVCNResourceName }}.default_security_list_id
   display_name                = "{{ $coreSecurityListName }}"
 
   egress_security_rules {
@@ -112,7 +112,7 @@ resource "oci_core_default_security_list" "{{ $coreSecurityListResourceName }}" 
 {{- if $isLoadbalancerCluster }}
   {{- range $role := $LoadBalancerRoles }}
   ingress_security_rules {
-    protocol  = "lookup(local.protocol_to_number, lower({{ $role.Protocol }}))"
+    protocol  = "${lookup(local.protocol_to_number, lower({{ $role.Protocol }}))}"
     source    = "0.0.0.0/0"
     tcp_options {
       max = "{{ $role.Port }}"

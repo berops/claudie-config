@@ -5,7 +5,7 @@
 {{- $isLoadbalancerCluster := eq .Data.ClusterData.ClusterType "LB" }}
 
 
-{{- range $i, $nodepool := .NodePools }}
+{{- range $i, $nodepool := .Data.NodePools }}
 
 {{- $region         := $nodepool.Details.Region }}
 {{- $specName       := $nodepool.Details.Provider.SpecName }}
@@ -35,7 +35,7 @@
 
           create_vnic_details {
             assign_public_ip  = true
-            subnet_id         = oci_core_subnet.{{ $coreSubnetResourceName }}_subnet.id
+            subnet_id         = oci_core_subnet.{{ $coreSubnetResourceName }}.id
           }
 
           freeform_tags = {
@@ -53,25 +53,25 @@
           metadata = {
               ssh_authorized_keys = file("./{{ $nodepool.Name }}")
               user_data = base64encode(<<EOF
-#cloud-config
-runcmd:
-  # Allow Claudie to ssh as root
-  - sed -n 's/^.*ssh-rsa/ssh-rsa/p' /root/.ssh/authorized_keys > /root/.ssh/temp
-  - cat /root/.ssh/temp > /root/.ssh/authorized_keys
-  - rm /root/.ssh/temp
-  - echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> sshd_config && service sshd restart
-  # Disable iptables
-  # Accept all traffic to avoid ssh lockdown via iptables firewall rules
-  - iptables -P INPUT ACCEPT
-  - iptables -P FORWARD ACCEPT
-  - iptables -P OUTPUT ACCEPT
-  # Flush and cleanup
-  - iptables -F
-  - iptables -X
-  - iptables -Z
-  # Make changes persistent
-  - netfilter-persistent save
-EOF
+              #cloud-config
+              runcmd:
+                # Allow Claudie to ssh as root
+                - sed -n 's/^.*ssh-rsa/ssh-rsa/p' /root/.ssh/authorized_keys > /root/.ssh/temp
+                - cat /root/.ssh/temp > /root/.ssh/authorized_keys
+                - rm /root/.ssh/temp
+                - echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> sshd_config && service sshd restart
+                # Disable iptables
+                # Accept all traffic to avoid ssh lockdown via iptables firewall rules
+                - iptables -P INPUT ACCEPT
+                - iptables -P FORWARD ACCEPT
+                - iptables -P OUTPUT ACCEPT
+                # Flush and cleanup
+                - iptables -F
+                - iptables -X
+                - iptables -Z
+                # Make changes persistent
+                - netfilter-persistent save
+              EOF
               )
           }
         {{- end }}
@@ -86,46 +86,42 @@ EOF
           metadata = {
               ssh_authorized_keys = file("./{{ $nodepool.Name }}")
               user_data = base64encode(<<EOF
-loud-config
-ncmd:
-# Allow Claudie to ssh as root
-- sed -n 's/^.*ssh-rsa/ssh-rsa/p' /root/.ssh/authorized_keys > /root/.ssh/temp
-- cat /root/.ssh/temp > /root/.ssh/authorized_keys
-- rm /root/.ssh/temp
-- echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> sshd_config && service sshd restart
-# Disable iptables
-# Accept all traffic to avoid ssh lockdown via iptables firewall rules
-- iptables -P INPUT ACCEPT
-- iptables -P FORWARD ACCEPT
-- iptables -P OUTPUT ACCEPT
-# Flush and cleanup
-- iptables -F
-- iptables -X
-- iptables -Z
-# Make changes persistent
-- netfilter-persistent save
-# Create longhorn volume directory
-- mkdir -p /opt/claudie/data
+              #cloud-config
+              runcmd:
+                # Allow Claudie to ssh as root
+                - sed -n 's/^.*ssh-rsa/ssh-rsa/p' /root/.ssh/authorized_keys > /root/.ssh/temp
+                - cat /root/.ssh/temp > /root/.ssh/authorized_keys
+                - rm /root/.ssh/temp
+                - echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> sshd_config && service sshd restart
+                # Disable iptables
+                # Accept all traffic to avoid ssh lockdown via iptables firewall rules
+                - iptables -P INPUT ACCEPT
+                - iptables -P FORWARD ACCEPT
+                - iptables -P OUTPUT ACCEPT
+                # Flush and cleanup
+                - iptables -F
+                - iptables -X
+                - iptables -Z
+                # Make changes persistent
+                - netfilter-persistent save
+                # Create longhorn volume directory
+                - mkdir -p /opt/claudie/data
 
                 {{- if $isWorkerNodeWithDiskAttached }}
-
-# Mount volume
-- |
-  sleep 50
-  disk=$(ls -l /dev/oracleoci | grep "${var.{{ $varStorageDiskName }}}" | awk '{print $NF}')
-  disk=$(basename "$disk")
-  if ! grep -qs "/dev/$disk" /proc/mounts; then
-    if ! blkid /dev/$disk | grep -q "TYPE=\"xfs\""; then
-      mkfs.xfs /dev/$disk
-    fi
-    mount /dev/$disk /opt/claudie/data
-    echo "/dev/$disk /opt/claudie/data xfs defaults 0 0" >> /etc/fstab
-  fi
-
+                # Mount volume
+                - |
+                  sleep 50
+                  disk=$(ls -l /dev/oracleoci | grep "${var.{{ $varStorageDiskName }}}" | awk '{print $NF}')
+                  disk=$(basename "$disk")
+                  if ! grep -qs "/dev/$disk" /proc/mounts; then
+                    if ! blkid /dev/$disk | grep -q "TYPE=\"xfs\""; then
+                      mkfs.xfs /dev/$disk
+                    fi
+                    mount /dev/$disk /opt/claudie/data
+                    echo "/dev/$disk /opt/claudie/data xfs defaults 0 0" >> /etc/fstab
+                  fi
                 {{- end }}
-
-EOF
-
+              EOF
               )
           }
         {{- end }}
