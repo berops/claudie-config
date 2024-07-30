@@ -45,7 +45,7 @@
 
         {{- if $isLoadbalancerCluster }}
           source_details {
-            source_id               = "{{ $nodepool.NodePool.Image }}"
+            source_id               = "{{ $nodepool.Details.Image }}"
             source_type             = "image"
             boot_volume_size_in_gbs = "50"
           }
