@@ -1,5 +1,5 @@
 {{- $specName          := .Data.Provider.SpecName }}
-{{- $gcpProject        := .Data.Provider.GcpProject }}
+{{- $gcpProject        := .Data.Provider.GetGcp.Project }}
 {{- $uniqueFingerPrint := .Fingerprint }}
 
 {{- range $_, $region := .Data.Regions}}

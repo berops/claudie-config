@@ -1,3 +1,8 @@
+{{- $specName          := .Data.Provider.SpecName }}
+{{- $gcpProject        := .Data.Provider.GcpProject }}
+{{- $uniqueFingerPrint := .Fingerprint }}
+{{- $resourceSuffix    := printf "%s_%s" $specName $uniqueFingerPrint }}
+
 provider "oci" {
   tenancy_ocid      = "{{ .Provider.OciTenancyOcid }}"
   user_ocid         = "{{ .Provider.OciUserOcid }}"
