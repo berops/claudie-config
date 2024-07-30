@@ -112,7 +112,7 @@ resource "oci_core_default_security_list" "{{ $coreSecurityListResourceName }}" 
 {{- if $isLoadbalancerCluster }}
   {{- range $role := $LoadBalancerRoles }}
   ingress_security_rules {
-    protocol  = "${lookup(local.protocol_to_number, lower({{ $role.Protocol }}))}"
+    protocol  = lookup(local.protocol_to_number, lower("{{ $role.Protocol }}"))
     source    = "0.0.0.0/0"
     tcp_options {
       max = "{{ $role.Port }}"
