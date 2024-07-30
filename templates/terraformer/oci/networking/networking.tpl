@@ -1,25 +1,46 @@
-{{- $clusterName := .ClusterData.ClusterName}}
-{{- $clusterHash := .ClusterData.ClusterHash}}
+{{- $clusterName           := .Data.ClusterData.ClusterName}}
+{{- $clusterHash           := .Data.ClusterData.ClusterHash}}
+{{- $specName              := .Data.Provider.SpecName }}
+{{- $uniqueFingerPrint     := .Fingerprint }}
+{{- $isKubernetesCluster   := eq .Data.ClusterData.ClusterType "K8s" }}
+{{- $isLoadbalancerCluster := eq .Data.ClusterData.ClusterType "LB" }}
+{{- $LoadBalancerRoles     := .Data.LBData.Roles }}
+{{- $K8sHasAPIServer       := .Data.K8sData.HasAPIServer }}
 
-{{- range $_, $region := .Regions }}
-{{- $specName := $.Provider.SpecName }}
-
-{{- if eq $.ClusterData.ClusterType "K8s" }}
-variable "oci_storage_disk_name_{{ $region }}_{{ $specName }}" {
-  default = "oraclevdb"
-  type    = string
+locals {
+  protocol_to_number = {
+    "tcp"    = 6
+    "udp"    = 17
+    "icmp"   = 1
+    "icmpv6" = 58
+  }
 }
+
+{{- range $_, $region := .Data.Regions }}
+
+{{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
+
+{{- if $isKubernetesCluster }}
+    {{- $varStorageDiskName  := printf "oci_storage_disk_name_%s" $resourceSuffix }}
+    variable "{{ $varStorageDiskName }}" {
+      default = "oraclevdb"
+      type    = string
+    }
 {{- end }}
 
-variable "default_compartment_id_{{ $region }}_{{ $specName }}" {
+{{- $varCompartmentID  := printf "default_compartment_id_%s" $resourceSuffix }}
+variable "{{ $varCompartmentID }}" {
   type    = string
-  default = "{{ $.Provider.OciCompartmentOcid }}"
+  default = "{{ $.Data.Provider.GetOci.CompartmentOCID }}"
 }
 
-resource "oci_core_vcn" "claudie_vcn_{{ $region }}_{{ $specName }}" {
-  provider        = oci.nodepool_{{ $region }}_{{ $specName }}
-  compartment_id  = var.default_compartment_id_{{ $region }}_{{ $specName }}
-  display_name    = "vcn-{{ $clusterHash }}-{{ $region }}-{{ $specName }}"
+{{- $coreVCNResourceName  := printf "claudie_vcn_%s"   $resourceSuffix }}
+{{- $coreVCNName          := printf "vcn-%s-%s-%s" $clusterHash $region $specName}}
+
+resource "oci_core_vcn" "{{ $coreVCNResourceName }}" {
+  provider        = oci.nodepool_{{ $resourceSuffix }}
+  compartment_id  = var.{{ $varCompartmentID }}
+  display_name    = "{{ $coreVCNName }}"
   cidr_blocks     = ["10.0.0.0/16"]
 
   freeform_tags = {
@@ -28,11 +49,14 @@ resource "oci_core_vcn" "claudie_vcn_{{ $region }}_{{ $specName }}" {
   }
 }
 
-resource "oci_core_internet_gateway" "claudie_gateway_{{ $region }}_{{ $specName }}" {
-  provider        = oci.nodepool_{{ $region }}_{{ $specName }}
-  compartment_id  = var.default_compartment_id_{{ $region }}_{{ $specName }}
-  display_name    = "gtw-{{ $clusterHash }}-{{ $region }}-{{ $specName }}"
-  vcn_id          = oci_core_vcn.claudie_vcn_{{ $region }}_{{ $specName }}.id
+{{- $coreGatewayResourceName  := printf "claudie_gateway_%s"   $resourceSuffix }}
+{{- $coreGatewayName          := printf "gtw-%s-%s-%s" $clusterHash $region $specName}}
+
+resource "oci_core_internet_gateway" "{{ $coreGatewayResourceName }}" {
+  provider        = oci.nodepool_{{ $resourceSuffix }}
+  compartment_id  = var.{{ varCompartmentID }}
+  display_name    = "{{ $coreGatewayName }}"
+  vcn_id          = oci_core_vcn.{{ $coreVCNResourceName }}.id
   enabled         = true
 
   freeform_tags = {
@@ -41,10 +65,13 @@ resource "oci_core_internet_gateway" "claudie_gateway_{{ $region }}_{{ $specName
   }
 }
 
-resource "oci_core_default_security_list" "claudie_security_rules_{{ $region }}_{{ $specName }}" {
-  provider                    = oci.nodepool_{{ $region }}_{{ $specName }}
-  manage_default_resource_id  = oci_core_vcn.claudie_vcn_{{ $region }}_{{ $specName }}.default_security_list_id
-  display_name                = "sl-{{ $clusterHash }}-{{ $region }}-{{ $specName }}"
+{{- $coreSecurityListResourceName  := printf "claudie_security_rules_%s"   $resourceSuffix }}
+{{- $coreSecurityListName          := printf "sl-%s-%s-%s" $clusterHash $region $specName}}
+
+resource "oci_core_default_security_list" "{{ $coreSecurityListResourceName }}" {
+  provider                    = oci.nodepool_{{ $resourceSuffix }}
+  manage_default_resource_id  = oci_core_vcn.{{ coreVCNResourceName }}.default_security_list_id
+  display_name                = "{{ $coreSecurityListName }}"
 
   egress_security_rules {
     destination = "0.0.0.0/0"
@@ -68,8 +95,8 @@ resource "oci_core_default_security_list" "claudie_security_rules_{{ $region }}_
     description = "Allow SSH connections"
   }
 
-{{- if eq $.ClusterData.ClusterType "K8s" }}
-  {{- if index $.Metadata "loadBalancers" | targetPorts | isMissing 6443 }}
+{{- if $isKubernetesCluster }}
+  {{- if $K8sHasAPIServer }}
   ingress_security_rules {
     protocol    = "6"
     source      = "0.0.0.0/0"
@@ -82,10 +109,10 @@ resource "oci_core_default_security_list" "claudie_security_rules_{{ $region }}_
   {{- end }}
 {{- end }}
 
-{{- if eq $.ClusterData.ClusterType "LB" }}
-  {{- range $role := index $.Metadata "roles"}}
+{{- if $isLoadbalancerCluster }}
+  {{- range $role := $LoadBalancerRoles }}
   ingress_security_rules {
-    protocol  = "{{ protocolToOCIProtocolNumber $role.Protocol}}"
+    protocol  = "lookup(local.protocol_to_number, lower({{ $role.Protocol }}))"
     source    = "0.0.0.0/0"
     tcp_options {
       max = "{{ $role.Port }}"
@@ -112,13 +139,15 @@ resource "oci_core_default_security_list" "claudie_security_rules_{{ $region }}_
   }
 }
 
-resource "oci_core_default_route_table" "claudie_routes_{{ $region }}_{{ $specName }}" {
-  provider                    = oci.nodepool_{{ $region }}_{{ $specName }}
-  manage_default_resource_id  = oci_core_vcn.claudie_vcn_{{ $region }}_{{ $specName }}.default_route_table_id
+{{- $coreRouteTableResourceName  := printf "claudie_routes_%s"   $resourceSuffix }}
+
+resource "oci_core_default_route_table" "{{ $coreRouteTableResourceName }}" {
+  provider                    = oci.nodepool_{{ $resourceSuffix }}
+  manage_default_resource_id  = oci_core_vcn.{{ $coreVCNResourceName }}.default_route_table_id
 
   route_rules {
     destination       = "0.0.0.0/0"
-    network_entity_id = oci_core_internet_gateway.claudie_gateway_{{ $region }}_{{ $specName }}.id
+    network_entity_id = oci_core_internet_gateway.{{ $coreGatewayResourceName }}.id
     destination_type  = "CIDR_BLOCK"
   }
 

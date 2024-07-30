@@ -1,5 +1,5 @@
 {{- $specName          := .Data.Provider.SpecName }}
-{{- $gcpProject        := .Data.Provider.GcpProject }}
+{{- $gcpProject        := .Data.Provider.GetGcp.Project }}
 {{- $uniqueFingerPrint := .Fingerprint }}
 {{- $resourceSuffix    := printf "%s_%s" $specName $uniqueFingerPrint }}
 

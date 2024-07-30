@@ -1,40 +1,39 @@
 {{- $specName          := .Data.Provider.SpecName }}
-{{- $gcpProject        := .Data.Provider.GcpProject }}
 {{- $uniqueFingerPrint := .Fingerprint }}
 {{- $resourceSuffix    := printf "%s_%s" $specName $uniqueFingerPrint }}
 
 provider "oci" {
-  tenancy_ocid      = "{{ .Provider.OciTenancyOcid }}"
-  user_ocid         = "{{ .Provider.OciUserOcid }}"
-  fingerprint       = "{{ .Provider.OciFingerprint }}"
-  private_key_path  = "{{ .Provider.SpecName }}"
+  tenancy_ocid      = "{{ .Provider.GetOci.TenancyOCID }}"
+  user_ocid         = "{{ .Provider.GetOci.UserOCID }}"
+  fingerprint       = "{{ .Provider.GetOci.KeyFingerprint }}"
+  private_key_path  = "{{ $specName }}"
   region            = "eu-frankfurt-1"
-  alias             = "dns_oci"
+  alias             = "dns_oci_{{ $resourceSuffix }}"
 }
 
-data "oci_dns_zones" "oci_zone" {
-    provider        = oci.dns_oci
-    compartment_id  = "{{ .Provider.OciCompartmentOcid }}"
-    name            = "{{ .DNSZone }}"
+data "oci_dns_zones" "oci_zone_{{ $resourceSuffix }}" {
+    provider        = oci.dns_oci_{{ $resourceSuffix }}
+    compartment_id  = "{{ .Provider.GetOci.CompartmentOCID }}"
+    name            = "{{ .Data.DNSZone }}"
 }
 
-resource "oci_dns_rrset" "record" {
-    provider        = oci.dns_oci
-    domain          = "{{ .HostnameHash }}.${data.oci_dns_zones.oci_zone.name}"
+resource "oci_dns_rrset" "record_{{ $resourceSuffix }}" {
+    provider        = oci.dns_oci_{{ $resourceSuffix }}
+    domain          = "{{ .Data.HostnameHash }}.${data.oci_dns_zones.oci_zone_{{ $resourceSuffix }}.name}"
     rtype           = "A"
-    zone_name_or_id = data.oci_dns_zones.oci_zone.name
+    zone_name_or_id = data.oci_dns_zones.oci_zone_{{ $resourceSuffix }}.name
 
-    compartment_id  = "{{ .Provider.OciCompartmentOcid }}"
-    {{- range $IP := .NodeIPs }}
+    compartment_id  = "{{ .Provider.GetOci.CompartmentOCID }}"
+    {{- range $ip := .Data.RecordData.IP }}
     items {
-       domain = "{{ $.HostnameHash }}.${data.oci_dns_zones.oci_zone.name}"
-       rdata  = "{{ $IP }}"
+       domain = "{{ $.Data.HostnameHash }}.${data.oci_dns_zones.oci_zone_{{ $resourceSuffix }}.name}"
+       rdata  = "{{ $ip.V4 }}"
        rtype  = "A"
        ttl    = 300
     }
     {{- end }}
 }
 
-output "{{ .ClusterName }}-{{ .ClusterHash }}" {
-  value = { "{{ .ClusterName }}-{{ .ClusterHash }}-endpoint" = oci_dns_rrset.record.domain }
+output "{{ .Data.ClusterName }}-{{ .Data.ClusterHash }}-{{ $uniqueFingerPrint }}" {
+  value = { "{{ .Data.ClusterName }}-{{ .Data.ClusterHash }}-endpoint" = oci_dns_rrset.record_{{ $resourceSuffix }}.domain }
 }

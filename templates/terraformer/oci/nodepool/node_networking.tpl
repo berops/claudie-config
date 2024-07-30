@@ -1,23 +1,35 @@
-{{- $clusterName := .ClusterData.ClusterName }}
-{{- $clusterHash := .ClusterData.ClusterHash }}
+{{- $clusterName       := .Data.ClusterData.ClusterName }}
+{{- $clusterHash       := .Data.ClusterData.ClusterHash }}
+{{- $uniqueFingerPrint := $.Fingerprint }}
 
-{{- range $i, $nodepool := .NodePools }}
-{{- $region   := $nodepool.NodePool.Region }}
-{{- $specName := $nodepool.NodePool.Provider.SpecName }}
-resource "oci_core_subnet" "{{ $nodepool.Name }}_{{ $region }}_{{ $specName }}_subnet" {
-  provider            = oci.nodepool_{{ $region }}_{{ $specName }}
-  vcn_id              = oci_core_vcn.claudie_vcn_{{ $region }}_{{ $specName }}.id
-  cidr_block          = "{{ index $.Metadata (printf "%s-subnet-cidr" $nodepool.Name)  }}"
-  compartment_id      = var.default_compartment_id_{{ $region }}_{{ $specName }}
-  display_name        = "snt-{{ $clusterHash }}-{{ $region }}-{{ $nodepool.Name }}"
-  security_list_ids   = [oci_core_vcn.claudie_vcn_{{ $region }}_{{ $specName }}.default_security_list_id]
-  route_table_id      = oci_core_vcn.claudie_vcn_{{ $region }}_{{ $specName }}.default_route_table_id
-  dhcp_options_id     = oci_core_vcn.claudie_vcn_{{ $region }}_{{ $specName }}.default_dhcp_options_id
-  availability_domain = "{{ $nodepool.NodePool.Zone }}"
+{{- range $_, $nodepool := .Data.NodePools }}
+
+{{- $region                     := $nodepool.Details.Region }}
+{{- $specName                   := $nodepool.Details.Provider.SpecName }}
+{{- $resourceSuffix             := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
+
+
+{{- $coreSubnetResourceName  := printf "%s_%s_subnet" $nodepool.Name $resourceSuffix }}
+{{- $coreSubnetName          := printf "snt-%s-%s-%s" $clusterHash $region $nodepool.Name }}
+{{- $coreSubnetCIDR          := $nodepool.Details.Cidr }}
+{{- $coreVCNResourceName     := printf "claudie_vcn_%s"   $resourceSuffix }}
+{{- $varCompartmentID        := printf "default_compartment_id_%s" $resourceSuffix }}
+
+resource "oci_core_subnet" "{{ $coreSubnetResourceName }}" {
+  provider            = oci.nodepool_{{ $resourceSuffix }}
+  vcn_id              = oci_core_vcn.{{ $coreVCNResourceName }}.id
+  cidr_block          = "{{ $coreSubnetCIDR }}"
+  compartment_id      = var.{{ $varCompartmentID }}
+  display_name        = "{{ $coreSubnetName }}"
+  security_list_ids   = [oci_core_vcn.{{ $coreVCNResourceName }}.default_security_list_id]
+  route_table_id      = oci_core_vcn.{{ $coreVCNResourceName }}.default_route_table_id
+  dhcp_options_id     = oci_core_vcn.{{ $coreVCNResourceName }}.default_dhcp_options_id
+  availability_domain = "{{ $nodepool.Details.Zone }}"
 
   freeform_tags = {
     "Managed-by"      = "Claudie"
     "Claudie-cluster" = "{{ $clusterName }}-{{ $clusterHash }}"
   }
 }
+
 {{- end }}
