@@ -4,9 +4,9 @@
 
 provider "azurerm" {
   features {}
-  subscription_id = "{{ .Provider.GetAzure.SubscriptionID }}"
-  tenant_id       = "{{ .Provider.GetAzure.TenantID }}"
-  client_id       = "{{ .Provider.GetAzure.ClientID }}"
+  subscription_id = "{{ .Data.Provider.GetAzure.SubscriptionID }}"
+  tenant_id       = "{{ .Data.Provider.GetAzure.TenantID }}"
+  client_id       = "{{ .Data.Provider.GetAzure.ClientID }}"
   client_secret   = "${file("{{ $specName }}")}"
   alias           = "dns_azure_{{ $resourceSuffix }}"
 }
