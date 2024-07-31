@@ -13,7 +13,7 @@ provider "oci" {
 
 data "oci_dns_zones" "oci_zone_{{ $resourceSuffix }}" {
     provider        = oci.dns_oci_{{ $resourceSuffix }}
-    compartment_id  = "{{ .Provider.GetOci.CompartmentOCID }}"
+    compartment_id  = "{{ .Data.Provider.GetOci.CompartmentOCID }}"
     name            = "{{ .Data.DNSZone }}"
 }
 
@@ -23,7 +23,7 @@ resource "oci_dns_rrset" "record_{{ $resourceSuffix }}" {
     rtype           = "A"
     zone_name_or_id = data.oci_dns_zones.oci_zone_{{ $resourceSuffix }}.name
 
-    compartment_id  = "{{ .Provider.GetOci.CompartmentOCID }}"
+    compartment_id  = "{{ .Data.Provider.GetOci.CompartmentOCID }}"
     {{- range $ip := .Data.RecordData.IP }}
     items {
        domain = "{{ $.Data.HostnameHash }}.${data.oci_dns_zones.oci_zone_{{ $resourceSuffix }}.name}"
