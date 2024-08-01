@@ -1,7 +1,7 @@
 {{- $specName          := .Data.Provider.SpecName }}
 {{- $uniqueFingerPrint := .Fingerprint }}
 
-{{- range $_, $region := .Regions }}
+{{- range $_, $region := .Data.Regions }}
 
 {{- $sanitisedRegion := replaceAll $region " " "_"}}
 {{- $resourceSuffix := printf "%s_%s_%s" $sanitisedRegion $specName $uniqueFingerPrint }}
