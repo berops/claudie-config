@@ -4,7 +4,7 @@
 {{- $isKubernetesCluster   := eq .Data.ClusterData.ClusterType "K8s" }}
 {{- $isLoadbalancerCluster := eq .Data.ClusterData.ClusterType "LB" }}
 
-{{- range $i, $nodepool := .NodePools }}
+{{- range $i, $nodepool := .Data.NodePools }}
 
 {{- $sanitisedRegion := replaceAll $nodepool.Details.Region " " "_"}}
 {{- $specName       := $nodepool.Details.Provider.SpecName }}

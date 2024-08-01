@@ -22,7 +22,7 @@ variable "{{ $basePriority }}" {
   default = 200
 }
 
-{{- range $_, $region := .Regions }}
+{{- range $_, $region := .Data.Regions }}
 {{- $sanitisedRegion := replaceAll $region " " "_"}}
 
 {{- $resourceSuffix := printf "%s_%s_%s" $sanitisedRegion $specName $uniqueFingerPrint }}
