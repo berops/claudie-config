@@ -2,7 +2,7 @@
 {{- $clusterHash       := .Data.ClusterData.ClusterHash }}
 {{- $uniqueFingerPrint := $.Fingerprint }}
 
-{{- range $i, $nodepool := .NodePools }}
+{{- range $i, $nodepool := .Data.NodePools }}
 
 {{- $region                     := $nodepool.Details.Region }}
 {{- $specName                   := $nodepool.Details.Provider.SpecName }}
