@@ -89,15 +89,23 @@
         {{- if $isLoadbalancerCluster }}
           protected_settings = <<PROT
           {
-              "script": "${base64encode(<<EOF
+                "script": "${base64encode(<<EOF
+#!/bin/bash
 # Allow ssh as root
 sudo sed -n 's/^.*ssh-rsa/ssh-rsa/p' /root/.ssh/authorized_keys > /root/.ssh/temp
 sudo cat /root/.ssh/temp > /root/.ssh/authorized_keys
 sudo rm /root/.ssh/temp
-sudo echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> sshd_config && service sshd restart
+sudo echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> sshd_config
+sshd_active=$(systemctl is-active sshd 2>/dev/null)
+if [ $sshd_active = 'active' ]; then
+    sudo service sshd restart
+else
+    # Ubuntu 24.04 doesn't have sshd service...
+    sudo service ssh restart
+fi
 EOF
-              )}"
-          }
+)}"
+        }
 PROT
         {{- end }}
 
@@ -113,7 +121,15 @@ set -euxo pipefail
 sudo sed -n 's/^.*ssh-rsa/ssh-rsa/p' /root/.ssh/authorized_keys > /root/.ssh/temp
 sudo cat /root/.ssh/temp > /root/.ssh/authorized_keys
 sudo rm /root/.ssh/temp
-sudo echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> sshd_config && service sshd restart
+sudo echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> sshd_config
+# The '|| true' part in the following cmd makes sure that this script doesn't fail when there is no sshd service.
+sshd_active=$(systemctl is-active sshd 2>/dev/null || true)
+if [ $sshd_active = 'active' ]; then
+    sudo service sshd restart
+else
+    # Ubuntu 24.04 doesn't have sshd service...
+    sudo service ssh restart
+fi
 # Create longhorn volume directory
 mkdir -p /opt/claudie/data
 
