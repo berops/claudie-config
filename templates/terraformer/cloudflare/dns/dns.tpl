@@ -7,23 +7,24 @@ provider "cloudflare" {
   alias = "cloudflare_dns_{{ $resourceSuffix }}"
 }
 
-data "cloudflare_zone" "cloudflare-zone-{{ $resourceSuffix }}" {
+data "cloudflare_zone" "cloudflare_zone_{{ $resourceSuffix }}" {
   provider   = cloudflare.cloudflare_dns_{{ $resourceSuffix }}
   name       = "{{ .Data.DNSZone }}"
 }
 
 {{- range $ip := .Data.RecordData.IP }}
 
-    {{- $recordResourceName := printf "record-%s-%s" $ip.EscapedV4 $resourceSuffix }}
+    {{- $escapedIPv4 := replaceAll $ip.V4 "." "_"}}
+    {{- $recordResourceName := printf "record_%s_%s" $escapedIPv4 $resourceSuffix }}
 
-resource "cloudflare_record" "{{ $recordResourceName }}" {
-  provider = cloudflare.cloudflare_dns_{{ $resourceSuffix }}
-  zone_id  = data.cloudflare_zone.cloudflare-zone-{{ $resourceSuffix }}.id
-  name     = "{{ $.Data.HostnameHash }}"
-  value    = "{{ $ip.V4 }}"
-  type     = "A"
-  ttl      = 300
-}
+    resource "cloudflare_record" "{{ $recordResourceName }}" {
+      provider = cloudflare.cloudflare_dns_{{ $resourceSuffix }}
+      zone_id  = data.cloudflare_zone.cloudflare_zone_{{ $resourceSuffix }}.id
+      name     = "{{ $.Data.HostnameHash }}"
+      value    = "{{ $ip.V4 }}"
+      type     = "A"
+      ttl      = 300
+    }
 
 {{- end }}
 

@@ -7,18 +7,19 @@ provider "hetznerdns" {
     alias = "hetzner_dns_{{ $resourceSuffix }}"
 }
 
-data "hetznerdns_zone" "hetzner-zone_{{ $resourceSuffix }}" {
+data "hetznerdns_zone" "hetzner_zone_{{ $resourceSuffix }}" {
     provider = hetznerdns.hetzner_dns_{{ $resourceSuffix }}
     name = "{{ .Data.DNSZone }}"
 }
 
 {{ range $ip := .Data.RecordData.IP }}
 
-    {{- $recordResourceName := printf "record_%s_%s" $ip.EscapedV4 $resourceSuffix }}
+    {{- $escapedIPv4 := replaceAll $ip.V4 "." "_"}}
+    {{- $recordResourceName := printf "record_%s_%s" $escapedIPv4 $resourceSuffix }}
 
     resource "hetznerdns_record" "{{ $recordResourceName }}" {
       provider = hetznerdns.hetzner_dns_{{ $resourceSuffix }}
-      zone_id = data.hetznerdns_zone.hetzner-zone_{{ $resourceSuffix }}.id
+      zone_id = data.hetznerdns_zone.hetzner_zone_{{ $resourceSuffix }}.id
       name = "{{ $.Data.HostnameHash }}"
       value = "{{ $ip.V4 }}"
       type = "A"
