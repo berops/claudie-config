@@ -120,7 +120,7 @@ resource "azurerm_network_security_group" "{{ $networkSecurityGroupResourceName 
 {{- end }}
 
 {{- if $isKubernetesCluster }}
-  {{- if $HasAPIServer }}
+  {{- if $K8sHasAPIServer }}
   security_rule {
     name                       = "KubeApi"
     priority                   = 103
