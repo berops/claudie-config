@@ -8,9 +8,9 @@
 
 provider "azurerm" {
   features {}
-  subscription_id = "{{ $.Data.Provider.SubscriptionID }}"
-  tenant_id       = "{{ $.Data.Provider.TenantID }}"
-  client_id       = "{{ $.Data.Provider.ClientID }}"
+  subscription_id = "{{ $.Data.Provider.GetAzure.SubscriptionID }}"
+  tenant_id       = "{{ $.Data.Provider.GetAzure.TenantID }}"
+  client_id       = "{{ $.Data.Provider.GetAzure.ClientID }}"
   client_secret   = file("{{ $specName }}")
   alias           = "nodepool_{{ $resourceSuffix }}"
 }
