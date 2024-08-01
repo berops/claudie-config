@@ -5,7 +5,7 @@
 {{- $isLoadbalancerCluster := eq .Data.ClusterData.ClusterType "LB" }}
 
 
-{{- range $_, $nodepool := .NodePools }}
+{{- range $_, $nodepool := .Data.NodePools }}
 
 {{- $region         := $nodepool.Details.Region }}
 {{- $specName       := $nodepool.Details.Provider.SpecName }}
