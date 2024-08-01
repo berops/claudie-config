@@ -29,7 +29,7 @@ locals {
     "E64s?.*",
   ]
 
-  combined_pattern_{{ $uniqueFingerPrint }} = join("|", local.vm_sizes_patterns)
+  combined_pattern_{{ $uniqueFingerPrint }} = join("|", local.vm_sizes_patterns_{{ $uniqueFingerPrint }})
 }
 
 
