@@ -1,13 +1,39 @@
-{{- $clusterName := .ClusterData.ClusterName }}
-{{- $clusterHash := .ClusterData.ClusterHash }}
+{{- $clusterName           := .Data.ClusterData.ClusterName}}
+{{- $clusterHash           := .Data.ClusterData.ClusterHash}}
+{{- $specName              := .Data.Provider.SpecName }}
+{{- $uniqueFingerPrint     := .Fingerprint }}
+{{- $isKubernetesCluster   := eq .Data.ClusterData.ClusterType "K8s" }}
+{{- $isLoadbalancerCluster := eq .Data.ClusterData.ClusterType "LB" }}
+{{- $LoadBalancerRoles     := .Data.LBData.Roles }}
+{{- $K8sHasAPIServer       := .Data.K8sData.HasAPIServer }}
+
+
+locals {
+  protocol_to_azure_protocol_{{ $uniqueFingerPrint }} = {
+    "tcp"    = "Tcp"
+    "udp"    = "Udp"
+    "icmp"   = "Icmp"
+  }
+}
+
+{{- $basePriority  := printf "base_priority_%s"   $uniqueFingerPrint }}
+variable "{{ $basePriority }}" {
+  type    = number
+  default = 200
+}
 
 {{- range $_, $region := .Regions }}
 {{- $sanitisedRegion := replaceAll $region " " "_"}}
-{{- $specName := $.Provider.SpecName }}
 
-resource "azurerm_resource_group" "rg_{{ $sanitisedRegion }}_{{ $specName }}" {
-  provider = azurerm.nodepool_{{ $sanitisedRegion }}_{{ $specName }}
-  name     = "rg-{{ $clusterHash }}-{{ $sanitisedRegion }}-{{ $specName }}"
+{{- $resourceSuffix := printf "%s_%s_%s" $sanitisedRegion $specName $uniqueFingerPrint }}
+
+
+{{- $resourceGroupResourceName  := printf "rg_%s"   $resourceSuffix }}
+{{- $resourceGroupName          := printf "rg-%s-%s-%s" $clusterHash $sanitisedRegion $specName}}
+
+resource "azurerm_resource_group" "{{ $resourceGroupResourceName }}" {
+  provider = azurerm.nodepool_{{ $resourceSuffix }}
+  name     = "{{ $resourceGroupName }}"
   location = "{{ $region }}"
 
   tags = {
@@ -16,12 +42,15 @@ resource "azurerm_resource_group" "rg_{{ $sanitisedRegion }}_{{ $specName }}" {
   }
 }
 
-resource "azurerm_virtual_network" "claudie_vn_{{ $sanitisedRegion }}_{{ $specName }}" {
-  provider            = azurerm.nodepool_{{ $sanitisedRegion }}_{{ $specName }}
-  name                = "vn-{{ $clusterHash }}-{{ $sanitisedRegion }}-{{ $specName }}"
+{{- $virtualNetworkResourceName  := printf "claudie_vn_%s"   $resourceSuffix }}
+{{- $virtualNetworkName          := printf "vn-%s-%s-%s" $clusterHash $sanitisedRegion $specName}}
+
+resource "azurerm_virtual_network" "{{ $virtualNetworkResourceName }}" {
+  provider            = azurerm.nodepool_{{ $resourceSuffix }}
+  name                = "{{ $virtualNetworkName }}"
   address_space       = ["10.0.0.0/16"]
   location            = "{{ $region }}"
-  resource_group_name = azurerm_resource_group.rg_{{ $sanitisedRegion }}_{{ $specName }}.name
+  resource_group_name = azurerm_resource_group.{{ $resourceGroupResourceName }}.name
 
   tags = {
     managed-by      = "Claudie"
@@ -29,11 +58,14 @@ resource "azurerm_virtual_network" "claudie_vn_{{ $sanitisedRegion }}_{{ $specNa
   }
 }
 
-resource "azurerm_network_security_group" "claudie_nsg_{{ $sanitisedRegion }}_{{ $specName }}" {
-  provider            = azurerm.nodepool_{{ $sanitisedRegion }}_{{ $specName }}
-  name                = "nsg-{{ $clusterHash }}-{{ $sanitisedRegion }}-{{ $specName }}"
+{{- $networkSecurityGroupResourceName  := printf "claudie_nsg_%s"   $resourceSuffix }}
+{{- $networkSecurityGroupName          := printf "nsg-%s-%s-%s" $clusterHash $sanitisedRegion $specName}}
+
+resource "azurerm_network_security_group" "{{ $networkSecurityGroupResourceName }}" {
+  provider            = azurerm.nodepool_{{ $resourceSuffix }}
+  name                = "{{ $networkSecurityGroupName }}"
   location            = "{{ $region }}"
-  resource_group_name = azurerm_resource_group.rg_{{ $sanitisedRegion }}_{{ $specName }}.name
+  resource_group_name = azurerm_resource_group.{{ $resourceGroupResourceName }}.name
 
   security_rule {
     name                       = "SSH"
@@ -71,14 +103,14 @@ resource "azurerm_network_security_group" "claudie_nsg_{{ $sanitisedRegion }}_{{
     destination_address_prefix = "*"
   }
 
-{{- if eq $.ClusterData.ClusterType "LB" }}
-  {{- range $i,$role := index $.Metadata "roles" }}
+{{- if $isLoadbalancerCluster }}
+  {{- range $i, $role := $LoadBalancerRoles }}
   security_rule {
     name                       = "Allow-{{ $role.Name }}"
-    priority                   = {{ assignPriority $i }}
+    priority                   = var.{{ $basePriority }} + {{ $i }}
     direction                  = "Inbound"
     access                     = "Allow"
-    protocol                   = "{{ protocolToAzureProtocolString $role.Protocol }}"
+    protocol                   = lookup(local.protocol_to_azure_protocol_{{ $uniqueFingerPrint }}, {{ $role.Protocol }}, "undefined")
     source_port_range          = "*"
     destination_port_range     = "{{ $role.Port }}"
     source_address_prefix      = "*"
@@ -87,8 +119,8 @@ resource "azurerm_network_security_group" "claudie_nsg_{{ $sanitisedRegion }}_{{
   {{- end }}
 {{- end }}
 
-{{- if eq $.ClusterData.ClusterType "K8s" }}
-  {{- if index $.Metadata "loadBalancers" | targetPorts | isMissing 6443 }}
+{{- if $isKubernetesCluster }}
+  {{- if $HasAPIServer }}
   security_rule {
     name                       = "KubeApi"
     priority                   = 103

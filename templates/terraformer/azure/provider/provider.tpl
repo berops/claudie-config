@@ -1,11 +1,18 @@
+{{- $specName          := .Data.Provider.SpecName }}
+{{- $uniqueFingerPrint := .Fingerprint }}
+
 {{- range $_, $region := .Regions }}
+
 {{- $sanitisedRegion := replaceAll $region " " "_"}}
+{{- $resourceSuffix := printf "%s_%s_%s" $sanitisedRegion $specName $uniqueFingerPrint }}
+
 provider "azurerm" {
   features {}
-  subscription_id = "{{ $.Provider.AzureSubscriptionId }}"
-  tenant_id       = "{{ $.Provider.AzureTenantId }}"
-  client_id       = "{{ $.Provider.AzureClientId }}"
-  client_secret   = file("{{ $.Provider.SpecName }}")
-  alias           = "nodepool_{{ $sanitisedRegion }}_{{ $.Provider.SpecName }}"
+  subscription_id = "{{ $.Data.Provider.SubscriptionID }}"
+  tenant_id       = "{{ $.Data.Provider.TenantID }}"
+  client_id       = "{{ $.Data.Provider.ClientID }}"
+  client_secret   = file("{{ $specName }}")
+  alias           = "nodepool_{{ $resourceSuffix }}"
 }
+
 {{- end}}
