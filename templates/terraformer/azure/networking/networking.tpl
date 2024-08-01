@@ -23,8 +23,8 @@ variable "{{ $basePriority }}" {
 }
 
 {{- range $_, $region := .Data.Regions }}
-{{- $sanitisedRegion := replaceAll $region " " "_"}}
 
+{{- $sanitisedRegion := replaceAll $region " " "_"}}
 {{- $resourceSuffix := printf "%s_%s_%s" $sanitisedRegion $specName $uniqueFingerPrint }}
 
 
@@ -110,7 +110,7 @@ resource "azurerm_network_security_group" "{{ $networkSecurityGroupResourceName 
     priority                   = var.{{ $basePriority }} + {{ $i }}
     direction                  = "Inbound"
     access                     = "Allow"
-    protocol                   = lookup(local.protocol_to_azure_protocol_{{ $uniqueFingerPrint }}, {{ $role.Protocol }}, "undefined")
+    protocol                   = lookup(local.protocol_to_azure_protocol_{{ $uniqueFingerPrint }}, "{{ $role.Protocol }}", "undefined")
     source_port_range          = "*"
     destination_port_range     = "{{ $role.Port }}"
     source_address_prefix      = "*"
