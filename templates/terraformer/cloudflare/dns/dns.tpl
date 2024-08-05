@@ -20,7 +20,7 @@ data "cloudflare_zone" "cloudflare_zone_{{ $resourceSuffix }}" {
     resource "cloudflare_record" "{{ $recordResourceName }}" {
       provider = cloudflare.cloudflare_dns_{{ $resourceSuffix }}
       zone_id  = data.cloudflare_zone.cloudflare_zone_{{ $resourceSuffix }}.id
-      name     = "{{ $.Data.HostnameHash }}"
+      name     = "{{ $.Data.Hostname }}"
       value    = "{{ $ip.V4 }}"
       type     = "A"
       ttl      = 300
@@ -29,5 +29,5 @@ data "cloudflare_zone" "cloudflare_zone_{{ $resourceSuffix }}" {
 {{- end }}
 
 output "{{ .Data.ClusterName }}_{{ .Data.ClusterHash }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
-  value = { "{{ .Data.ClusterName }}-{{ .Data.ClusterHash }}-endpoint" = format("%s.%s", "{{ .Data.HostnameHash }}", "{{ .Data.DNSZone }}")}
+  value = { "{{ .Data.ClusterName }}-{{ .Data.ClusterHash }}-endpoint" = format("%s.%s", "{{ .Data.Hostname }}", "{{ .Data.DNSZone }}")}
 }
