@@ -34,6 +34,7 @@ resource "aws_route53_record" "record_{{ $resourceSuffix }}" {
     ]
 }
 
-output "{{ .Data.ClusterName }}_{{ .Data.ClusterHash }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
+{{- $clusterID := printf "%s-%s" .Data.ClusterName .Data.ClusterHash }}
+output "{{ $clusterID }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
     value = { "{{ .Data.ClusterName }}-{{ .Data.ClusterHash }}-endpoint" = aws_route53_record.record_{{ $resourceSuffix }}.name }
 }

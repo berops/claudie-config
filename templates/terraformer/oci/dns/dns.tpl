@@ -34,6 +34,7 @@ resource "oci_dns_rrset" "record_{{ $resourceSuffix }}" {
     {{- end }}
 }
 
-output "{{ .Data.ClusterName }}_{{ .Data.ClusterHash }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
+{{- $clusterID := printf "%s-%s" .Data.ClusterName .Data.ClusterHash }}
+output "{{ $clusterID }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
   value = { "{{ .Data.ClusterName }}-{{ .Data.ClusterHash }}-endpoint" = oci_dns_rrset.record_{{ $resourceSuffix }}.domain }
 }

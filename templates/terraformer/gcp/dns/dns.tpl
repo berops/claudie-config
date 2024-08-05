@@ -30,6 +30,7 @@ resource "google_dns_record_set" "record_{{ $resourceSuffix }}" {
     ]
 }
 
-output "{{.Data.ClusterName}}_{{.Data.ClusterHash}}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
+{{- $clusterID := printf "%s-%s" .Data.ClusterName .Data.ClusterHash }}
+output "{{ $clusterID }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
   value = { "{{.Data.ClusterName}}-{{.Data.ClusterHash}}-endpoint" = google_dns_record_set.record_{{ $resourceSuffix }}.name }
 }
