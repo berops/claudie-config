@@ -59,7 +59,7 @@ resource "azurerm_virtual_network" "{{ $virtualNetworkResourceName }}" {
 }
 
 {{- $networkSecurityGroupResourceName  := printf "claudie_nsg_%s"   $resourceSuffix }}
-{{- $networkSecurityGroupName          := printf "nsg-%s-%s-%s-%s" $clusterName $clusterHash $sanitisedRegion $specName $uniqueFingerPrint }}
+{{- $networkSecurityGroupName          := printf "nsg-%s-%s-%s-%s-%s" $clusterName $clusterHash $sanitisedRegion $specName $uniqueFingerPrint }}
 
 resource "azurerm_network_security_group" "{{ $networkSecurityGroupResourceName }}" {
   provider            = azurerm.nodepool_{{ $resourceSuffix }}
