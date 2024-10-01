@@ -20,7 +20,7 @@
 {{- end }}
 
 {{- $computeNetworkResourceName  := printf "network_%s"   $resourceSuffix }}
-{{- $computeNetworkName          := printf "net-%s-%s-%s" $clusterHash $region $specName}}
+{{- $computeNetworkName          := printf "net%s-%s-%s-%s" $clusterHash $region $specName $uniqueFingerPrint }}
 
 resource "google_compute_network" "{{ $computeNetworkResourceName }}" {
   provider                = google.nodepool_{{ $resourceSuffix }}
@@ -30,7 +30,7 @@ resource "google_compute_network" "{{ $computeNetworkResourceName }}" {
 }
 
 {{- $computeFirewallResourceName     := printf "firewall_%s"  $resourceSuffix }}
-{{- $computeFirewallName             := printf "fwl-%s-%s-%s" $clusterHash $region $specName}}
+{{- $computeFirewallName             := printf "fwl%s-%s-%s-%s" $clusterHash $region $specName $uniqueFingerPrint }}
 
 
 resource "google_compute_firewall" "{{ $computeFirewallResourceName }}" {
