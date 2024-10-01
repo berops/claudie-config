@@ -12,7 +12,7 @@
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
 
 {{- $vpcResourceName  := printf "claudie_vpc_%s"  $resourceSuffix }}
-{{- $vpcName          := printf "vpc%s-%s-%s-%s" $clusterHash $region $specName $uniqueFingerPrint }}
+{{- $vpcName          := printf "vpc%s-%s-%s"     $clusterHash $region $uniqueFingerPrint }}
 
 resource "aws_vpc" "{{ $vpcResourceName }}" {
   provider   = aws.nodepool_{{ $resourceSuffix }}
@@ -26,7 +26,7 @@ resource "aws_vpc" "{{ $vpcResourceName }}" {
 
 
 {{- $internetGatewayResourceName  := printf "claudie_gateway_%s"   $resourceSuffix }}
-{{- $internetGatewayName          := printf "gtw%s-%s-%s-%s" $clusterHash $region $specName $uniqueFingerPrint }}
+{{- $internetGatewayName          := printf "gtw%s-%s-%s"          $clusterHash $region $uniqueFingerPrint }}
 
 resource "aws_internet_gateway" "{{ $internetGatewayResourceName }}" {
   provider = aws.nodepool_{{ $resourceSuffix }}
@@ -39,7 +39,7 @@ resource "aws_internet_gateway" "{{ $internetGatewayResourceName }}" {
 }
 
 {{- $routeTableResourceName  := printf "claudie_route_table_%s"   $resourceSuffix }}
-{{- $routeTableName          := printf "rt%s-%s-%s-%s" $clusterHash $region $specName $uniqueFingerPrint }}
+{{- $routeTableName          := printf "rt%s-%s-%s"               $clusterHash $region $uniqueFingerPrint }}
 
 resource "aws_route_table" "{{ $routeTableResourceName }}" {
   provider     = aws.nodepool_{{ $resourceSuffix }}
@@ -56,7 +56,7 @@ resource "aws_route_table" "{{ $routeTableResourceName }}" {
 }
 
 {{- $securityGroupResourceName  := printf "claudie_sg_%s"   $resourceSuffix }}
-{{- $securityGroupName          := printf "sg%s-%s-%s-%s" $clusterHash $region $specName $uniqueFingerPrint }}
+{{- $securityGroupName          := printf "sg%s-%s-%s" $clusterHash $region $uniqueFingerPrint }}
 
 resource "aws_security_group" "{{ $securityGroupResourceName }}" {
   provider               = aws.nodepool_{{ $resourceSuffix }}

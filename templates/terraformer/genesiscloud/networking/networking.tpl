@@ -20,7 +20,7 @@ data "genesiscloud_images" "base_os_{{ $resourceSuffix }}" {
 }
 
 {{- $securityGroupResourceName := printf "claudie_security_group_%s" $resourceSuffix }}
-{{- $securityGroupName         := printf "sg%s-%s-%s-%s" $clusterHash $region $specName $uniqueFingerPrint }}
+{{- $securityGroupName         := printf "sg%s-%s-%s" $clusterHash $region $uniqueFingerPrint }}
 
 resource "genesiscloud_security_group" "{{ $securityGroupResourceName }}" {
   provider = genesiscloud.nodepool_{{ $resourceSuffix }}
