@@ -66,7 +66,7 @@ resource "oci_core_internet_gateway" "{{ $coreGatewayResourceName }}" {
 }
 
 {{- $coreSecurityListResourceName  := printf "claudie_security_rules_%s"   $resourceSuffix }}
-{{- $coreSecurityListName          := printf "sl%s-%s-%s" $clusterHash $region $specName $uniqueFingerPrint }}
+{{- $coreSecurityListName          := printf "sl%s-%s-%s-%s" $clusterHash $region $specName $uniqueFingerPrint }}
 
 resource "oci_core_default_security_list" "{{ $coreSecurityListResourceName }}" {
   provider                    = oci.nodepool_{{ $resourceSuffix }}
