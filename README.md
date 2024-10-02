@@ -1,3 +1,3 @@
 # claudie-config
-Claudie templates and configurations
+Claudie related templates for spawning infrastructure across supported cloud providers.
  
