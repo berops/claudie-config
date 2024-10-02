@@ -35,7 +35,7 @@ variable "{{ $varCompartmentID }}" {
 }
 
 {{- $coreVCNResourceName  := printf "claudie_vcn_%s"   $resourceSuffix }}
-{{- $coreVCNName          := printf "vcn%s-%s-%s"      $clusterHash $region $uniqueFingerPrint }}
+{{- $coreVCNName          := printf "vcn%s%s-%s"       $clusterHash $uniqueFingerPrint $region }}
 
 resource "oci_core_vcn" "{{ $coreVCNResourceName }}" {
   provider        = oci.nodepool_{{ $resourceSuffix }}
@@ -50,7 +50,7 @@ resource "oci_core_vcn" "{{ $coreVCNResourceName }}" {
 }
 
 {{- $coreGatewayResourceName  := printf "claudie_gateway_%s"   $resourceSuffix }}
-{{- $coreGatewayName          := printf "gtw%s-%s-%s"          $clusterHash $region $uniqueFingerPrint }}
+{{- $coreGatewayName          := printf "gtw%s%s-%s"           $clusterHash $uniqueFingerPrint $region }}
 
 resource "oci_core_internet_gateway" "{{ $coreGatewayResourceName }}" {
   provider        = oci.nodepool_{{ $resourceSuffix }}
@@ -66,7 +66,7 @@ resource "oci_core_internet_gateway" "{{ $coreGatewayResourceName }}" {
 }
 
 {{- $coreSecurityListResourceName  := printf "claudie_security_rules_%s"   $resourceSuffix }}
-{{- $coreSecurityListName          := printf "sl%s-%s-%s"                  $clusterHash $region $uniqueFingerPrint }}
+{{- $coreSecurityListName          := printf "sl%s%s-%s"                   $clusterHash $uniqueFingerPrint $region }}
 
 resource "oci_core_default_security_list" "{{ $coreSecurityListResourceName }}" {
   provider                    = oci.nodepool_{{ $resourceSuffix }}

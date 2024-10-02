@@ -9,7 +9,7 @@
 {{- $resourceSuffix        := printf "%s_%s" $specName $uniqueFingerPrint }}
 
 {{- $firewallResourceName  := printf "firewall_%s" $resourceSuffix }}
-{{- $firewallName  := printf "fwl%s-%s" $clusterHash $uniqueFingerPrint }}
+{{- $firewallName  := printf "fwl%s%s" $clusterHash $uniqueFingerPrint }}
 
 resource "hcloud_firewall" "{{ $firewallResourceName }}" {
   provider = hcloud.nodepool_{{ $resourceSuffix }}

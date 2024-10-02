@@ -28,8 +28,8 @@ variable "{{ $basePriority }}" {
 {{- $resourceSuffix := printf "%s_%s_%s" $sanitisedRegion $specName $uniqueFingerPrint }}
 
 
-{{- $resourceGroupResourceName  := printf "rg_%s"   $resourceSuffix }}
-{{- $resourceGroupName          := printf "rg%s-%s-%s" $clusterHash $sanitisedRegion $uniqueFingerPrint }}
+{{- $resourceGroupResourceName  := printf "rg_%s"     $resourceSuffix }}
+{{- $resourceGroupName          := printf "rg%s%s-%s" $clusterHash $uniqueFingerPrint $sanitisedRegion }}
 
 resource "azurerm_resource_group" "{{ $resourceGroupResourceName }}" {
   provider = azurerm.nodepool_{{ $resourceSuffix }}
@@ -43,7 +43,7 @@ resource "azurerm_resource_group" "{{ $resourceGroupResourceName }}" {
 }
 
 {{- $virtualNetworkResourceName  := printf "claudie_vn_%s"   $resourceSuffix }}
-{{- $virtualNetworkName          := printf "vn%s-%s-%s"      $clusterHash $sanitisedRegion $uniqueFingerPrint }}
+{{- $virtualNetworkName          := printf "vn%s%s-%s"      $clusterHash $uniqueFingerPrint $sanitisedRegion }}
 
 resource "azurerm_virtual_network" "{{ $virtualNetworkResourceName }}" {
   provider            = azurerm.nodepool_{{ $resourceSuffix }}
@@ -59,7 +59,7 @@ resource "azurerm_virtual_network" "{{ $virtualNetworkResourceName }}" {
 }
 
 {{- $networkSecurityGroupResourceName  := printf "claudie_nsg_%s"   $resourceSuffix }}
-{{- $networkSecurityGroupName          := printf "nsg%s-%s-%s"      $clusterHash $sanitisedRegion $uniqueFingerPrint }}
+{{- $networkSecurityGroupName          := printf "nsg%s%s-%s"       $clusterHash $uniqueFingerPrint $sanitisedRegion  }}
 
 resource "azurerm_network_security_group" "{{ $networkSecurityGroupResourceName }}" {
   provider            = azurerm.nodepool_{{ $resourceSuffix }}
