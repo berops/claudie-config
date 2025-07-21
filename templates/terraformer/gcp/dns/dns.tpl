@@ -19,7 +19,8 @@ resource "google_compute_health_check" "gcp_health_check_{{ $resourceSuffix }}" 
   healthy_threshold  = 2
   unhealthy_threshold = 2
   tcp_health_check {
-    port = 6443
+    # Claudie creates a default role for loadbalancers which acts as a healthcheck, that is open on port 65534
+    port = 65534
   }
   source_regions = ["europe-central2", "us-central1", "asia-northeast1"]
 }

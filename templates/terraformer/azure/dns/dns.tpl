@@ -32,7 +32,8 @@ resource "azurerm_traffic_manager_profile" "traffic_manager_{{ $hostname }}_{{ $
 
   monitor_config {
     protocol = "TCP"
-    port     = 6443
+    # Claudie creates a default role for loadbalancers which acts as a healthcheck, that is open on port 65534
+    port     = 65534
   }
 }
 

@@ -16,7 +16,6 @@
 
 	  managed_zone = data.google_dns_managed_zone.gcp_zone_{{ $resourceSuffix }}.name
 	  rrdatas = ["{{ $hostname }}.${data.google_dns_managed_zone.gcp_zone_{{ $resourceSuffix }}.dns_name}"]
-
 	}
 
 	output "{{ $clusterID }}_{{ $alternativeName }}_{{ $resourceSuffix }}" {

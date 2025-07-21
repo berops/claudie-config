@@ -36,16 +36,17 @@ data "aws_route53_zone" "aws_zone_{{ $resourceSuffix }}" {
     ]
 
     set_identifier  = "record_{{ $hostname }}_{{ $escapedIPv4 }}_{{ $resourceSuffix }}"
-    health_check_id = aws_route53_health_check.hc_{{ $hostname }}_{{ $escapedIPv4 }}.id
+    health_check_id = aws_route53_health_check.hc_{{ $hostname }}_{{ $escapedIPv4 }}_{{ $resourceSuffix }}.id
 
     weighted_routing_policy {
       weight = 1
     }
   }
 
-  resource "aws_route53_health_check" "hc_{{ $hostname }}_{{ $escapedIPv4 }}" {
+  resource "aws_route53_health_check" "hc_{{ $hostname }}_{{ $escapedIPv4 }}_{{ $resourceSuffix }}" {
     provider          = aws.dns_aws_{{ $resourceSuffix }}
-    port              = 6443
+    # Claudie creates a default role for loadbalancers which acts as a healthcheck, that is open on port 65534
+    port              = 65534
     type              = "TCP"
     request_interval  = 30
     failure_threshold = 3

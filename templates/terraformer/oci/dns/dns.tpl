@@ -25,7 +25,8 @@ resource "oci_health_checks_ping_monitor" "oci_health_checks_{{ $resourceSuffix 
   display_name        = "health-check-{{ $hostname }}"
   interval_in_seconds = 30
   protocol = "TCP"
-  port  = 6443
+  # Claudie creates a default role for loadbalancers which acts as a healthcheck, that is open on port 65534
+  port  = 65534
   targets = [
     {{- range $ip := .Data.RecordData.IP }}
       "{{ $ip.V4 }}",
@@ -64,7 +65,7 @@ resource "oci_dns_steering_policy" "oci_steering_policy_{{ $resourceSuffix }}" {
   }
 
   rules {
-		rule_type = "WEIGHTED" 
+	rule_type = "WEIGHTED"
     {{- range $ip := .Data.RecordData.IP }}
     default_answer_data {
       answer_condition = "answer.name == '{{ $ip.V4 }}.${data.oci_dns_zones.oci_zone_{{ $resourceSuffix }}.name}'"
@@ -84,11 +85,10 @@ locals {
 }
 
 resource "oci_dns_steering_policy_attachment" "dns_steering_policy_attachment_{{ $resourceSuffix }}" {
-  provider        = oci.dns_oci_{{ $resourceSuffix }}
-	domain_name = "{{ $hostname }}.${data.oci_dns_zones.oci_zone_{{ $resourceSuffix }}.name}"
-	steering_policy_id = oci_dns_steering_policy.oci_steering_policy_{{ $resourceSuffix }}.id
-	zone_id = local.matching_zone_{{ $resourceSuffix }}.id
-
+  provider           = oci.dns_oci_{{ $resourceSuffix }}
+  domain_name        = "{{ $hostname }}.${data.oci_dns_zones.oci_zone_{{ $resourceSuffix }}.name}"
+  steering_policy_id = oci_dns_steering_policy.oci_steering_policy_{{ $resourceSuffix }}.id
+  zone_id            = local.matching_zone_{{ $resourceSuffix }}.id
 }
 
 output "{{ $clusterID }}_{{ $resourceSuffix }}" {
