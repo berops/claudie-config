@@ -7,7 +7,7 @@
 	{{- range $_, $alternativeName := .Data.AlternativeNamesExtension.Names }}
     {{- $recordResourceName := printf "record_%s_%s" $alternativeName $resourceSuffix }}
 
-    resource "cloudflare_dns_record" "{{ $recordResourceName }}" {
+    resource "cloudflare_record" "{{ $recordResourceName }}" {
         provider = cloudflare.cloudflare_dns_{{ $resourceSuffix }}
         zone_id = data.cloudflare_zone.cloudflare_zone_{{ $resourceSuffix }}.id
         name = "{{ $alternativeName }}"
