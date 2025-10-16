@@ -137,7 +137,7 @@ mkdir -p /opt/claudie/data
 
 # Mount managed disk only when not mounted yet
 sleep 50
-disk=$(ls -l /dev/disk/by-path | grep "lun-${azurerm_virtual_machine_data_disk_attachment.{{ $vmDiskAttachmentResourceName }}.lun}" | awk '{print $NF}')
+disk=$(lsscsi :::"${azurerm_virtual_machine_data_disk_attachment.{{ $vmDiskAttachmentResourceName }}.lun}" | awk '{print $NF}')
 disk=$(basename "$disk")
 if ! grep -qs "/dev/$disk" /proc/mounts; then
   if ! blkid /dev/$disk | grep -q "TYPE=\"xfs\""; then
