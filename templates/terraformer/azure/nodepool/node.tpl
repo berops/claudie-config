@@ -181,7 +181,7 @@ PROT
           provider           = azurerm.nodepool_{{ $resourceSuffix }}
           managed_disk_id    = azurerm_managed_disk.{{ $vmDiskResourceName }}.id
           virtual_machine_id = azurerm_linux_virtual_machine.{{ $virtualMachineResourceName }}.id
-          lun                = "1"
+          lun                = "37"
           caching            = "ReadWrite"
         }
             {{- end }}
