@@ -22,9 +22,11 @@ locals {
 {{- $varCompartmentID  := printf "default_compartment_id_%s" $resourceSuffix }}
 
 # Fetch available availability domains for the region
+# Note: Availability domains must be queried using the tenancy OCID (root compartment),
+# not a sub-compartment OCID, as ADs are tenancy-level resources.
 data "oci_identity_availability_domains" "available_{{ $resourceSuffix }}" {
   provider       = oci.nodepool_{{ $resourceSuffix }}
-  compartment_id = var.{{ $varCompartmentID }}
+  compartment_id = "{{ $.Data.Provider.GetOci.TenancyOCID }}"
 }
 
 {{- if $isKubernetesCluster }}

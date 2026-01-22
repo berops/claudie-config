@@ -24,6 +24,13 @@
           zone                      = "{{ $nodepool.Details.Zone }}"
         {{- else }}
           zone                      = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, {{ $nodeIndex }} % length(data.google_compute_zones.available_{{ $resourceSuffix }}.names))
+
+          lifecycle {
+            precondition {
+              condition     = length(data.google_compute_zones.available_{{ $resourceSuffix }}.names) > 0
+              error_message = "No available zones found for region {{ $region }}. Check GCP permissions or region configuration."
+            }
+          }
         {{- end }}
           name                      = "{{ $node.Name }}"
           machine_type              = "{{ $nodepool.Details.ServerType }}"
@@ -114,6 +121,13 @@ EOF
               zone     = "{{ $nodepool.Details.Zone }}"
             {{- else }}
               zone     = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, {{ $nodeIndex }} % length(data.google_compute_zones.available_{{ $resourceSuffix }}.names))
+
+              lifecycle {
+                precondition {
+                  condition     = length(data.google_compute_zones.available_{{ $resourceSuffix }}.names) > 0
+                  error_message = "No available zones found for region {{ $region }}. Check GCP permissions or region configuration."
+                }
+              }
             {{- end }}
               size     = {{ $nodepool.Details.StorageDiskSize }}
 
@@ -131,6 +145,13 @@ EOF
               zone        = "{{ $nodepool.Details.Zone }}"
             {{- else }}
               zone        = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, {{ $nodeIndex }} % length(data.google_compute_zones.available_{{ $resourceSuffix }}.names))
+
+              lifecycle {
+                precondition {
+                  condition     = length(data.google_compute_zones.available_{{ $resourceSuffix }}.names) > 0
+                  error_message = "No available zones found for region {{ $region }}. Check GCP permissions or region configuration."
+                }
+              }
             {{- end }}
               device_name = var.{{ $varStorageDiskName }}
             }

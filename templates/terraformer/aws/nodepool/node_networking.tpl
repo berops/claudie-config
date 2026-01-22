@@ -40,18 +40,25 @@ resource "aws_route_table_association" "{{ $associationResourceName }}" {
 
 {{- else }}
 {{- /* Zone is NOT specified - create per-node subnets distributed across availability zones */}}
+{{- /* Calculate newbits dynamically based on node count to support >16 nodes */}}
+{{- $nodeCount := len $nodepool.Nodes }}
+{{- $newbits := 4 }}{{- /* Default: supports up to 16 nodes */}}
+{{- if gt $nodeCount 16 }}{{- $newbits = 5 }}{{- end }}{{- /* 32 nodes */}}
+{{- if gt $nodeCount 32 }}{{- $newbits = 6 }}{{- end }}{{- /* 64 nodes */}}
+{{- if gt $nodeCount 64 }}{{- $newbits = 7 }}{{- end }}{{- /* 128 nodes */}}
+{{- if gt $nodeCount 128 }}{{- $newbits = 8 }}{{- end }}{{- /* 256 nodes */}}
 
     {{- range $nodeIndex, $node := $nodepool.Nodes }}
 
         {{- $subnetResourceName        := printf "%s_%s_%s_subnet" $nodepool.Name $node.Name $resourceSuffix }}
         {{- $subnetName                := printf "snt-%s-%s-%s-%s" $clusterHash $region $nodepool.Name $node.Name }}
         {{- /* Calculate subnet CIDR: base CIDR with node-specific offset */}}
-        {{- /* Using /24 subnets within the nodepool's CIDR range */}}
+        {{- /* newbits is calculated dynamically based on node count */}}
 
 resource "aws_subnet" "{{ $subnetResourceName }}" {
   provider                = aws.nodepool_{{ $resourceSuffix }}
   vpc_id                  = aws_vpc.{{ $vpcResourceName }}.id
-  cidr_block              = cidrsubnet("{{ $nodepool.Details.Cidr }}", 4, {{ $nodeIndex }})
+  cidr_block              = cidrsubnet("{{ $nodepool.Details.Cidr }}", {{ $newbits }}, {{ $nodeIndex }})
   map_public_ip_on_launch = true
   availability_zone       = element(data.aws_availability_zones.available_{{ $resourceSuffix }}.names, {{ $nodeIndex }} % length(data.aws_availability_zones.available_{{ $resourceSuffix }}.names))
 

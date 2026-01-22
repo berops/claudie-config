@@ -32,7 +32,8 @@
         {{- if $nodepool.Details.Zone }}
           zone                  = "{{$nodepool.Details.Zone}}"
         {{- else }}
-          zone                  = element(local.azure_zones_{{ $specName }}_{{ $uniqueFingerPrint }}, {{ $nodeIndex }} % length(local.azure_zones_{{ $specName }}_{{ $uniqueFingerPrint }}))
+          # Zone is only set if the region supports availability zones
+          zone                  = length(local.azure_zones_{{ $resourceSuffix }}) > 0 ? element(local.azure_zones_{{ $resourceSuffix }}, {{ $nodeIndex }} % length(local.azure_zones_{{ $resourceSuffix }})) : null
         {{- end }}
 
           source_image_reference {
@@ -171,7 +172,8 @@ PROT
         {{- if $nodepool.Details.Zone }}
           zone                 = {{ $nodepool.Details.Zone }}
         {{- else }}
-          zone                 = element(local.azure_zones_{{ $specName }}_{{ $uniqueFingerPrint }}, {{ $nodeIndex }} % length(local.azure_zones_{{ $specName }}_{{ $uniqueFingerPrint }}))
+          # Zone is only set if the region supports availability zones
+          zone                 = length(local.azure_zones_{{ $resourceSuffix }}) > 0 ? element(local.azure_zones_{{ $resourceSuffix }}, {{ $nodeIndex }} % length(local.azure_zones_{{ $resourceSuffix }})) : null
         {{- end }}
           resource_group_name  = azurerm_resource_group.{{ $resourceGroupResourceName }}.name
           storage_account_type = "StandardSSD_LRS"
