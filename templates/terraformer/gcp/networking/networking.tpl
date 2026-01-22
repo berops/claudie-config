@@ -11,6 +11,13 @@
 
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
 
+# Fetch available zones for the region
+data "google_compute_zones" "available_{{ $resourceSuffix }}" {
+  provider = google.nodepool_{{ $resourceSuffix }}
+  region   = "{{ $region }}"
+  status   = "UP"
+}
+
 {{- if $isKubernetesCluster }}
     {{- $varStorageDiskName  := printf "gcp_storage_disk_name_%s" $resourceSuffix }}
     variable "{{ $varStorageDiskName}}" {

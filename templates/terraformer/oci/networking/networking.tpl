@@ -19,6 +19,13 @@ locals {
 {{- range $_, $region := .Data.Regions }}
 
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
+{{- $varCompartmentID  := printf "default_compartment_id_%s" $resourceSuffix }}
+
+# Fetch available availability domains for the region
+data "oci_identity_availability_domains" "available_{{ $resourceSuffix }}" {
+  provider       = oci.nodepool_{{ $resourceSuffix }}
+  compartment_id = var.{{ $varCompartmentID }}
+}
 
 {{- if $isKubernetesCluster }}
     {{- $varStorageDiskName  := printf "oci_storage_disk_name_%s" $resourceSuffix }}

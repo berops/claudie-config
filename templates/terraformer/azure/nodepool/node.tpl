@@ -1,16 +1,17 @@
 {{- $clusterName           := .Data.ClusterData.ClusterName}}
 {{- $clusterHash           := .Data.ClusterData.ClusterHash}}
 {{- $uniqueFingerPrint     := .Fingerprint }}
+{{- $specName              := (index .Data.NodePools 0).Details.Provider.SpecName }}
 {{- $isKubernetesCluster   := eq .Data.ClusterData.ClusterType "K8s" }}
 {{- $isLoadbalancerCluster := eq .Data.ClusterData.ClusterType "LB" }}
 
 {{- range $i, $nodepool := .Data.NodePools }}
 
 {{- $sanitisedRegion := replaceAll $nodepool.Details.Region " " "_"}}
-{{- $specName       := $nodepool.Details.Provider.SpecName }}
-{{- $resourceSuffix := printf "%s_%s_%s" $sanitisedRegion $specName $uniqueFingerPrint }}
+{{- $nodepoolSpecName       := $nodepool.Details.Provider.SpecName }}
+{{- $resourceSuffix := printf "%s_%s_%s" $sanitisedRegion $nodepoolSpecName $uniqueFingerPrint }}
 
-    {{- range $node := $nodepool.Nodes }}
+    {{- range $nodeIndex, $node := $nodepool.Nodes }}
 
         {{- $virtualMachineResourceName   := printf "%s_%s" $node.Name $resourceSuffix }}
         {{- $resourceGroupResourceName    := printf "rg_%s"   $resourceSuffix }}
@@ -28,7 +29,11 @@
           resource_group_name   = azurerm_resource_group.{{ $resourceGroupResourceName }}.name
           network_interface_ids = [azurerm_network_interface.{{ $networkInterfaceResourceName }}.id]
           size                  = "{{$nodepool.Details.ServerType}}"
+        {{- if $nodepool.Details.Zone }}
           zone                  = "{{$nodepool.Details.Zone}}"
+        {{- else }}
+          zone                  = element(local.azure_zones_{{ $specName }}_{{ $uniqueFingerPrint }}, {{ $nodeIndex }} % length(local.azure_zones_{{ $specName }}_{{ $uniqueFingerPrint }}))
+        {{- end }}
 
           source_image_reference {
             publisher = split(":", "{{ $nodepool.Details.Image }}")[0]
@@ -163,7 +168,11 @@ PROT
           provider             = azurerm.nodepool_{{ $resourceSuffix }}
           name                 = "{{ $vmDiskName }}"
           location             = "{{ $nodepool.Details.Region }}"
+        {{- if $nodepool.Details.Zone }}
           zone                 = {{ $nodepool.Details.Zone }}
+        {{- else }}
+          zone                 = element(local.azure_zones_{{ $specName }}_{{ $uniqueFingerPrint }}, {{ $nodeIndex }} % length(local.azure_zones_{{ $specName }}_{{ $uniqueFingerPrint }}))
+        {{- end }}
           resource_group_name  = azurerm_resource_group.{{ $resourceGroupResourceName }}.name
           storage_account_type = "StandardSSD_LRS"
           create_option        = "Empty"
@@ -189,7 +198,7 @@ PROT
 
     {{- end }}
 
-output "{{ $nodepool.Name }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
+output "{{ $nodepool.Name }}_{{ $nodepoolSpecName }}_{{ $uniqueFingerPrint }}" {
   value = {
     {{- range $node := $nodepool.Nodes }}
         {{- $virtualMachineResourceName   := printf "%s_%s" $node.Name $resourceSuffix }}

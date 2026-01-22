@@ -11,7 +11,7 @@
 {{- $specName       := $nodepool.Details.Provider.SpecName }}
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
 
-    {{- range $node := $nodepool.Nodes }}
+    {{- range $nodeIndex, $node := $nodepool.Nodes }}
 
         {{- $computeInstanceResourceName  := printf "%s_%s" $node.Name $resourceSuffix }}
         {{- $computeSubnetResourceName    := printf "%s_%s_subnet" $nodepool.Name $resourceSuffix }}
@@ -20,7 +20,11 @@
 
         resource "google_compute_instance" "{{ $computeInstanceResourceName}}" {
           provider                  = google.nodepool_{{ $resourceSuffix }}
+        {{- if $nodepool.Details.Zone }}
           zone                      = "{{ $nodepool.Details.Zone }}"
+        {{- else }}
+          zone                      = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, {{ $nodeIndex }} % length(data.google_compute_zones.available_{{ $resourceSuffix }}.names))
+        {{- end }}
           name                      = "{{ $node.Name }}"
           machine_type              = "{{ $nodepool.Details.ServerType }}"
           description   = "Managed by Claudie for cluster {{ $clusterName }}-{{ $clusterHash }}"
@@ -106,7 +110,11 @@ EOF
               # suffix 'd' as otherwise the creation of the VM instance and attachment of the disk will fail, if having the same name as the node.
               name     = "{{ $computeDiskName }}"
               type     = "pd-ssd"
+            {{- if $nodepool.Details.Zone }}
               zone     = "{{ $nodepool.Details.Zone }}"
+            {{- else }}
+              zone     = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, {{ $nodeIndex }} % length(data.google_compute_zones.available_{{ $resourceSuffix }}.names))
+            {{- end }}
               size     = {{ $nodepool.Details.StorageDiskSize }}
 
               labels = {
@@ -119,7 +127,11 @@ EOF
               provider    = google.nodepool_{{ $resourceSuffix }}
               disk        = google_compute_disk.{{ $computeDiskResourceName }}.id
               instance    = google_compute_instance.{{ $computeInstanceResourceName }}.id
+            {{- if $nodepool.Details.Zone }}
               zone        = "{{ $nodepool.Details.Zone }}"
+            {{- else }}
+              zone        = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, {{ $nodeIndex }} % length(data.google_compute_zones.available_{{ $resourceSuffix }}.names))
+            {{- end }}
               device_name = var.{{ $varStorageDiskName }}
             }
             {{- end }}

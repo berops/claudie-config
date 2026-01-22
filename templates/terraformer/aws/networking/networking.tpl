@@ -11,6 +11,12 @@
 
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
 
+# Fetch available availability zones for the region
+data "aws_availability_zones" "available_{{ $resourceSuffix }}" {
+  provider = aws.nodepool_{{ $resourceSuffix }}
+  state    = "available"
+}
+
 {{- $vpcResourceName  := printf "claudie_vpc_%s"  $resourceSuffix }}
 {{- $vpcName          := printf "vpc%s%s-%s"      $clusterHash $uniqueFingerPrint $region }}
 

@@ -14,6 +14,8 @@ locals {
     "udp"    = "Udp"
     "icmp"   = "Icmp"
   }
+  # Available zones for uniform distribution when zone is not specified
+  azure_zones_{{ $specName }}_{{ $uniqueFingerPrint }} = ["1", "2", "3"]
 }
 
 {{- $basePriority  := printf "base_priority_%s_%s" $specName $uniqueFingerPrint }}
