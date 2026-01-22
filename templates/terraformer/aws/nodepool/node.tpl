@@ -24,10 +24,16 @@ resource "aws_key_pair" "{{ $keypairResourceName }}" {
   }
 }
 
-    {{- range $node := $nodepool.Nodes }}
+    {{- range $nodeIndex, $node := $nodepool.Nodes }}
 
         {{- $instanceResourceName         := printf "%s_%s" $node.Name $resourceSuffix }}
-        {{- $subnetResourceName           := printf "%s_%s_subnet" $nodepool.Name $resourceSuffix }}
+        {{- /* Subnet name depends on whether zone is specified */}}
+        {{- $subnetResourceName           := "" }}
+        {{- if $nodepool.Details.Zone }}
+            {{- $subnetResourceName = printf "%s_%s_subnet" $nodepool.Name $resourceSuffix }}
+        {{- else }}
+            {{- $subnetResourceName = printf "%s_%s_%s_subnet" $nodepool.Name $node.Name $resourceSuffix }}
+        {{- end }}
         {{- $securityGroupResourceName    := printf "claudie_sg_%s"   $resourceSuffix }}
         {{- $isWorkerNodeWithDiskAttached := and (not $nodepool.IsControl) (gt $nodepool.Details.StorageDiskSize 0) }}
         {{- $volumeResourceName           := printf "%s_%s_volume" $node.Name $resourceSuffix }}
@@ -35,7 +41,11 @@ resource "aws_key_pair" "{{ $keypairResourceName }}" {
 
         resource "aws_instance" "{{ $instanceResourceName }}" {
           provider          = aws.nodepool_{{ $resourceSuffix }}
+        {{- if $nodepool.Details.Zone }}
           availability_zone = "{{ $nodepool.Details.Zone }}"
+        {{- else }}
+          availability_zone = element(data.aws_availability_zones.available_{{ $resourceSuffix }}.names, {{ $nodeIndex }} % length(data.aws_availability_zones.available_{{ $resourceSuffix }}.names))
+        {{- end }}
           instance_type     = "{{ $nodepool.Details.ServerType }}"
           ami               = "{{ $nodepool.Details.Image }}"
 
@@ -132,7 +142,11 @@ fi
 
         resource "aws_ebs_volume" "{{ $volumeResourceName }}" {
           provider          = aws.nodepool_{{ $resourceSuffix }}
+        {{- if $nodepool.Details.Zone }}
           availability_zone = "{{ $nodepool.Details.Zone }}"
+        {{- else }}
+          availability_zone = element(data.aws_availability_zones.available_{{ $resourceSuffix }}.names, {{ $nodeIndex }} % length(data.aws_availability_zones.available_{{ $resourceSuffix }}.names))
+        {{- end }}
           size              = {{ $nodepool.Details.StorageDiskSize }}
           type              = "gp2"
 

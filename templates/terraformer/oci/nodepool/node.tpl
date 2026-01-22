@@ -11,7 +11,7 @@
 {{- $specName       := $nodepool.Details.Provider.SpecName }}
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
 
-    {{- range $node := $nodepool.Nodes }}
+    {{- range $nodeIndex, $node := $nodepool.Nodes }}
 
         {{- $coreInstanceResourceName     := printf "%s_%s" $node.Name $resourceSuffix }}
         {{- $coreSubnetResourceName       := printf "%s_%s_subnet" $nodepool.Name $resourceSuffix }}
@@ -22,7 +22,11 @@
         resource "oci_core_instance" "{{ $coreInstanceResourceName }}" {
           provider            = oci.nodepool_{{ $resourceSuffix }}
           compartment_id      = var.{{ $varCompartmentID }}
+        {{- if $nodepool.Details.Zone }}
           availability_domain = "{{ $nodepool.Details.Zone }}"
+        {{- else }}
+          availability_domain = element(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains, {{ $nodeIndex }} % length(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains)).name
+        {{- end }}
           shape               = "{{ $nodepool.Details.ServerType }}"
           display_name        = "{{ $node.Name }}"
 
@@ -161,7 +165,11 @@
             resource "oci_core_volume" "{{ $coreVolumeResourceName }}" {
               provider            = oci.nodepool_{{ $resourceSuffix }}
               compartment_id      = var.{{ $varCompartmentID }}
+            {{- if $nodepool.Details.Zone }}
               availability_domain = "{{ $nodepool.Details.Zone }}"
+            {{- else }}
+              availability_domain = element(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains, {{ $nodeIndex }} % length(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains)).name
+            {{- end }}
               size_in_gbs         = "{{ $nodepool.Details.StorageDiskSize }}"
               display_name        = "{{ $coreVolumeName }}"
               vpus_per_gb         = 10
