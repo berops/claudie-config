@@ -19,7 +19,6 @@ locals {
 {{- range $_, $region := .Data.Regions }}
 
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
-{{- $varCompartmentID  := printf "default_compartment_id_%s" $resourceSuffix }}
 
 # Fetch available availability domains for the region
 # Note: Availability domains must be queried using the tenancy OCID (root compartment),
