@@ -39,6 +39,20 @@
           description   = "Managed by Claudie for cluster {{ $clusterName }}-{{ $clusterHash }}"
           allow_stopping_for_update = true
 
+          {{- /* GPU Guest Accelerator Configuration */}}
+          {{- if and $nodepool.Details.MachineSpec $nodepool.Details.MachineSpec.NvidiaGpuCount }}
+          {{- if gt $nodepool.Details.MachineSpec.NvidiaGpuCount 0 }}
+          guest_accelerator {
+            type  = "{{ $nodepool.Details.MachineSpec.NvidiaGpuType }}"
+            count = {{ $nodepool.Details.MachineSpec.NvidiaGpuCount }}
+          }
+
+          scheduling {
+            on_host_maintenance = "TERMINATE"
+          }
+          {{- end }}
+          {{- end }}
+
           network_interface {
             subnetwork = google_compute_subnetwork.{{ $computeSubnetResourceName }}.self_link
             access_config {
