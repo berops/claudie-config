@@ -37,7 +37,7 @@
           server_type   = "{{ $nodepool.Details.ServerType }}"
           image         = "{{ $nodepool.Details.Image }}"
           firewall_ids  = [ hcloud_firewall.{{ $firewallResourceName }}.id ]
-          datacenter    = "{{ $nodepool.Details.Zone }}"
+          location      = "{{ $nodepool.Details.Region }}"
           public_net {
              ipv6_enabled = false
           }
