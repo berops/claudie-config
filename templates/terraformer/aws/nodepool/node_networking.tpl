@@ -20,7 +20,6 @@ resource "aws_subnet" "{{ $subnetResourceName }}" {
   provider                = aws.nodepool_{{ $resourceSuffix }}
   vpc_id                  = aws_vpc.{{ $vpcResourceName }}.id
   cidr_block              = "{{ $subnetCIDR }}"
-  map_public_ip_on_launch = true
   availability_zone       = "{{ $nodepool.Details.Zone }}"
 
   tags = {
@@ -58,7 +57,6 @@ resource "aws_subnet" "{{ $subnetResourceName }}" {
   provider                = aws.nodepool_{{ $resourceSuffix }}
   vpc_id                  = aws_vpc.{{ $vpcResourceName }}.id
   cidr_block              = cidrsubnet("{{ $nodepool.Details.Cidr }}", {{ $newbits }}, {{ $nodeIndex }})
-  map_public_ip_on_launch = true
   availability_zone       = element(data.aws_availability_zones.available_{{ $resourceSuffix }}.names, {{ $nodeIndex }} % length(data.aws_availability_zones.available_{{ $resourceSuffix }}.names))
 
   tags = {
