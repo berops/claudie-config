@@ -21,6 +21,8 @@ resource "exoscale_security_group_rule" "icmp_{{ $resourceSuffix }}" {
   security_group_id = exoscale_security_group.{{ $sgResourceName }}.id
   type              = "INGRESS"
   protocol          = "ICMP"
+  icmp_type         = 8
+  icmp_code         = 0
   cidr              = "0.0.0.0/0"
 }
 
