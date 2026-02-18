@@ -131,7 +131,10 @@ mkdir -p /opt/claudie/data
 
 # Mount block storage volume only when not mounted yet
 sleep 50
-disk=$(ls -l /dev/disk/by-id | grep "${exoscale_block_storage_volume.{{ $volumeResourceName }}.id}" | awk '{print $NF}')
+# Linux virtio driver truncates serial numbers to 20 chars, so we match on a prefix of the volume UUID
+volume_id="${exoscale_block_storage_volume.{{ $volumeResourceName }}.id}"
+short_id=$(echo "$volume_id" | cut -c1-20)
+disk=$(ls -l /dev/disk/by-id | grep "$short_id" | awk '{print $NF}')
 disk=$(basename "$disk")
 if ! grep -qs "/dev/$disk" /proc/mounts; then
   if ! blkid /dev/$disk | grep -q "TYPE=\"xfs\""; then
