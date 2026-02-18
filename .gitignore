@@ -1,19 +1,36 @@
+# IDEs and editors
 .idea/
-*.ini
+.vscode/
+
+# OS
+.DS_Store
+
+# Terraform / OpenTofu
 .terraform*
-clusters
-playground
-.vscode
-mongodb
 *.tfstate*
+
+# Credentials and keys
 *.pem
+*.ini
+*.conf
+
+# Build artifacts
+bin/
+__debug_bin
+
+# Clusters and manifests
+clusters/
+playground/
+.manifest*
 kubeone.yaml
 cluster.tar.gz
 cluster-kubeconfig
-*.conf
-__debug_bin
+mongodb/
+
+# Python
 /venv/
 /site/
-bin
-.manifest*
-.DS_Store
+
+# Claude
+.claude/
+CLAUDE.md
