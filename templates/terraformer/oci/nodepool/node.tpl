@@ -25,7 +25,7 @@
         {{- if $nodepool.Details.Zone }}
           availability_domain = "{{ $nodepool.Details.Zone }}"
         {{- else }}
-          availability_domain = element(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains, {{ $nodeIndex }} % length(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains)).name
+          availability_domain = element(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains, parseint(substr(md5("{{ $node.Name }}"), 0, 2), 16) % length(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains)).name
         {{- end }}
           shape               = "{{ $nodepool.Details.ServerType }}"
           display_name        = "{{ $node.Name }}"
@@ -168,7 +168,7 @@
             {{- if $nodepool.Details.Zone }}
               availability_domain = "{{ $nodepool.Details.Zone }}"
             {{- else }}
-              availability_domain = element(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains, {{ $nodeIndex }} % length(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains)).name
+              availability_domain = element(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains, parseint(substr(md5("{{ $node.Name }}"), 0, 2), 16) % length(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains)).name
             {{- end }}
               size_in_gbs         = "{{ $nodepool.Details.StorageDiskSize }}"
               display_name        = "{{ $coreVolumeName }}"
