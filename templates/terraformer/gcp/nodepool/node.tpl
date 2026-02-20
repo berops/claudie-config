@@ -32,7 +32,7 @@
         {{- if $nodepool.Details.Zone }}
           zone                      = "{{ $nodepool.Details.Zone }}"
         {{- else }}
-          zone                      = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(substr(md5("{{ $node.Name }}"), 0, 2), 16) % length(data.google_compute_zones.available_{{ $resourceSuffix }}.names))
+          zone                      = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % length(data.google_compute_zones.available_{{ $resourceSuffix }}.names))
         {{- end }}
           name                      = "{{ $node.Name }}"
           machine_type              = "{{ $nodepool.Details.ServerType }}"
@@ -168,7 +168,7 @@ EOF
             {{- if $nodepool.Details.Zone }}
               zone     = "{{ $nodepool.Details.Zone }}"
             {{- else }}
-              zone     = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(substr(md5("{{ $node.Name }}"), 0, 2), 16) % length(data.google_compute_zones.available_{{ $resourceSuffix }}.names))
+              zone     = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % length(data.google_compute_zones.available_{{ $resourceSuffix }}.names))
             {{- end }}
               size     = {{ $nodepool.Details.StorageDiskSize }}
 
@@ -185,7 +185,7 @@ EOF
             {{- if $nodepool.Details.Zone }}
               zone        = "{{ $nodepool.Details.Zone }}"
             {{- else }}
-              zone        = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(substr(md5("{{ $node.Name }}"), 0, 2), 16) % length(data.google_compute_zones.available_{{ $resourceSuffix }}.names))
+              zone        = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % length(data.google_compute_zones.available_{{ $resourceSuffix }}.names))
             {{- end }}
               device_name = var.{{ $varStorageDiskName }}
             }

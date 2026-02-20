@@ -63,7 +63,7 @@ resource "aws_key_pair" "{{ $keypairResourceName }}" {
         {{- if $nodepool.Details.Zone }}
           availability_zone = "{{ $nodepool.Details.Zone }}"
         {{- else }}
-          availability_zone = element(data.aws_availability_zones.available_{{ $resourceSuffix }}.names, parseint(substr(md5("{{ $node.Name }}"), 0, 2), 16) % length(data.aws_availability_zones.available_{{ $resourceSuffix }}.names))
+          availability_zone = element(data.aws_availability_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % length(data.aws_availability_zones.available_{{ $resourceSuffix }}.names))
         {{- end }}
           instance_type     = "{{ $nodepool.Details.ServerType }}"
           ami               = "{{ $nodepool.Details.Image }}"
@@ -163,7 +163,7 @@ fi
         {{- if $nodepool.Details.Zone }}
           availability_zone = "{{ $nodepool.Details.Zone }}"
         {{- else }}
-          availability_zone = element(data.aws_availability_zones.available_{{ $resourceSuffix }}.names, parseint(substr(md5("{{ $node.Name }}"), 0, 2), 16) % length(data.aws_availability_zones.available_{{ $resourceSuffix }}.names))
+          availability_zone = element(data.aws_availability_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % length(data.aws_availability_zones.available_{{ $resourceSuffix }}.names))
         {{- end }}
           size              = {{ $nodepool.Details.StorageDiskSize }}
           type              = "gp2"
