@@ -10,7 +10,7 @@
 {{- $nodepoolSpecName       := $nodepool.Details.Provider.SpecName }}
 {{- $resourceSuffix := printf "%s_%s_%s" $sanitisedRegion $nodepoolSpecName $uniqueFingerPrint }}
 
-    {{- range $nodeIndex, $node := $nodepool.Nodes }}
+    {{- range $_, $node := $nodepool.Nodes }}
 
         {{- $virtualMachineResourceName   := printf "%s_%s" $node.Name $resourceSuffix }}
         {{- $resourceGroupResourceName    := printf "rg_%s"   $resourceSuffix }}
@@ -32,7 +32,7 @@
           zone                  = "{{$nodepool.Details.Zone}}"
         {{- else }}
           # Zone is only set if the region supports availability zones
-          zone                  = length(local.azure_zones_{{ $resourceSuffix }}) > 0 ? element(local.azure_zones_{{ $resourceSuffix }}, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % length(local.azure_zones_{{ $resourceSuffix }})) : null
+          zone                  = length(local.azure_zones_{{ $resourceSuffix }}) > 0 ? element(local.azure_zones_{{ $resourceSuffix }}, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16)) : null
         {{- end }}
 
           source_image_reference {
@@ -172,7 +172,7 @@ PROT
           zone                 = {{ $nodepool.Details.Zone }}
         {{- else }}
           # Zone is only set if the region supports availability zones
-          zone                 = length(local.azure_zones_{{ $resourceSuffix }}) > 0 ? element(local.azure_zones_{{ $resourceSuffix }}, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % length(local.azure_zones_{{ $resourceSuffix }})) : null
+          zone                 = length(local.azure_zones_{{ $resourceSuffix }}) > 0 ? element(local.azure_zones_{{ $resourceSuffix }}, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16)) : null
         {{- end }}
           resource_group_name  = azurerm_resource_group.{{ $resourceGroupResourceName }}.name
           storage_account_type = "StandardSSD_LRS"

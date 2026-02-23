@@ -41,12 +41,13 @@ resource "aws_route_table_association" "{{ $associationResourceName }}" {
 {{- /* Calculate newbits dynamically based on node count to support >16 nodes */}}
 {{- $nodeCount := len $nodepool.Nodes }}
 {{- $newbits := 4 }}{{- /* Default: supports up to 16 nodes */}}
-{{- if gt $nodeCount 16 }}{{- $newbits = 5 }}{{- end }}{{- /* 32 nodes */}}
-{{- if gt $nodeCount 32 }}{{- $newbits = 6 }}{{- end }}{{- /* 64 nodes */}}
-{{- if gt $nodeCount 64 }}{{- $newbits = 7 }}{{- end }}{{- /* 128 nodes */}}
-{{- if gt $nodeCount 128 }}{{- $newbits = 8 }}{{- end }}{{- /* 256 nodes */}}
+{{- $maxSubnets := 16 }}
+{{- if gt $nodeCount 16 }}{{- $newbits = 5 }}{{- $maxSubnets = 32 }}{{- end }}{{- /* 32 nodes */}}
+{{- if gt $nodeCount 32 }}{{- $newbits = 6 }}{{- $maxSubnets = 64 }}{{- end }}{{- /* 64 nodes */}}
+{{- if gt $nodeCount 64 }}{{- $newbits = 7 }}{{- $maxSubnets = 128 }}{{- end }}{{- /* 128 nodes */}}
+{{- if gt $nodeCount 128 }}{{- $newbits = 8 }}{{- $maxSubnets = 256 }}{{- end }}{{- /* 256 nodes */}}
 
-    {{- range $nodeIndex, $node := $nodepool.Nodes }}
+    {{- range $_, $node := $nodepool.Nodes }}
 
         {{- $subnetResourceName        := printf "%s_%s_%s_subnet" $nodepool.Name $node.Name $resourceSuffix }}
         {{- $subnetName                := printf "snt-%s-%s-%s-%s" $clusterHash $region $nodepool.Name $node.Name }}
@@ -56,8 +57,8 @@ resource "aws_route_table_association" "{{ $associationResourceName }}" {
 resource "aws_subnet" "{{ $subnetResourceName }}" {
   provider                = aws.nodepool_{{ $resourceSuffix }}
   vpc_id                  = aws_vpc.{{ $vpcResourceName }}.id
-  cidr_block              = cidrsubnet("{{ $nodepool.Details.Cidr }}", {{ $newbits }}, {{ $nodeIndex }})
-  availability_zone       = element(data.aws_availability_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % length(data.aws_availability_zones.available_{{ $resourceSuffix }}.names))
+  cidr_block              = cidrsubnet("{{ $nodepool.Details.Cidr }}", {{ $newbits }}, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % {{ $maxSubnets }})
+  availability_zone       = element(data.aws_availability_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16))
 
   tags = {
     Name            = "{{ $subnetName }}"

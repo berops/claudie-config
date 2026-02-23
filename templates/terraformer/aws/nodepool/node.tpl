@@ -24,7 +24,7 @@ resource "aws_key_pair" "{{ $keypairResourceName }}" {
   }
 }
 
-    {{- range $nodeIndex, $node := $nodepool.Nodes }}
+    {{- range $_, $node := $nodepool.Nodes }}
 
         {{- $instanceResourceName         := printf "%s_%s" $node.Name $resourceSuffix }}
         {{- /* Subnet name depends on whether zone is specified */}}
@@ -63,7 +63,7 @@ resource "aws_key_pair" "{{ $keypairResourceName }}" {
         {{- if $nodepool.Details.Zone }}
           availability_zone = "{{ $nodepool.Details.Zone }}"
         {{- else }}
-          availability_zone = element(data.aws_availability_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % length(data.aws_availability_zones.available_{{ $resourceSuffix }}.names))
+          availability_zone = element(data.aws_availability_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16))
         {{- end }}
           instance_type     = "{{ $nodepool.Details.ServerType }}"
           ami               = "{{ $nodepool.Details.Image }}"
@@ -163,7 +163,7 @@ fi
         {{- if $nodepool.Details.Zone }}
           availability_zone = "{{ $nodepool.Details.Zone }}"
         {{- else }}
-          availability_zone = element(data.aws_availability_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % length(data.aws_availability_zones.available_{{ $resourceSuffix }}.names))
+          availability_zone = element(data.aws_availability_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16))
         {{- end }}
           size              = {{ $nodepool.Details.StorageDiskSize }}
           type              = "gp2"

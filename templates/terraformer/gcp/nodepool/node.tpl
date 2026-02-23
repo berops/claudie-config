@@ -11,7 +11,7 @@
 {{- $specName       := $nodepool.Details.Provider.SpecName }}
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
 
-    {{- range $nodeIndex, $node := $nodepool.Nodes }}
+    {{- range $_, $node := $nodepool.Nodes }}
 
         {{- $computeExternalIpResourceName  := printf "%s_%s_external_ip" $node.Name $resourceSuffix }}
         {{- $computeExternalIpName          := printf "i%s" $node.Name }}
@@ -32,7 +32,7 @@
         {{- if $nodepool.Details.Zone }}
           zone                      = "{{ $nodepool.Details.Zone }}"
         {{- else }}
-          zone                      = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % length(data.google_compute_zones.available_{{ $resourceSuffix }}.names))
+          zone                      = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16))
         {{- end }}
           name                      = "{{ $node.Name }}"
           machine_type              = "{{ $nodepool.Details.ServerType }}"
@@ -168,7 +168,7 @@ EOF
             {{- if $nodepool.Details.Zone }}
               zone     = "{{ $nodepool.Details.Zone }}"
             {{- else }}
-              zone     = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % length(data.google_compute_zones.available_{{ $resourceSuffix }}.names))
+              zone     = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16))
             {{- end }}
               size     = {{ $nodepool.Details.StorageDiskSize }}
 
@@ -185,7 +185,7 @@ EOF
             {{- if $nodepool.Details.Zone }}
               zone        = "{{ $nodepool.Details.Zone }}"
             {{- else }}
-              zone        = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % length(data.google_compute_zones.available_{{ $resourceSuffix }}.names))
+              zone        = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16))
             {{- end }}
               device_name = var.{{ $varStorageDiskName }}
             }

@@ -11,7 +11,7 @@
 {{- $specName       := $nodepool.Details.Provider.SpecName }}
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
 
-    {{- range $nodeIndex, $node := $nodepool.Nodes }}
+    {{- range $_, $node := $nodepool.Nodes }}
 
         {{- $coreInstanceResourceName     := printf "%s_%s" $node.Name $resourceSuffix }}
         {{- $coreSubnetResourceName       := printf "%s_%s_subnet" $nodepool.Name $resourceSuffix }}
@@ -25,7 +25,7 @@
         {{- if $nodepool.Details.Zone }}
           availability_domain = "{{ $nodepool.Details.Zone }}"
         {{- else }}
-          availability_domain = element(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % length(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains)).name
+          availability_domain = element(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16)).name
         {{- end }}
           shape               = "{{ $nodepool.Details.ServerType }}"
           display_name        = "{{ $node.Name }}"
@@ -168,7 +168,7 @@
             {{- if $nodepool.Details.Zone }}
               availability_domain = "{{ $nodepool.Details.Zone }}"
             {{- else }}
-              availability_domain = element(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % length(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains)).name
+              availability_domain = element(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16)).name
             {{- end }}
               size_in_gbs         = "{{ $nodepool.Details.StorageDiskSize }}"
               display_name        = "{{ $coreVolumeName }}"
