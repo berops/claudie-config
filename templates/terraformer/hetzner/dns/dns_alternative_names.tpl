@@ -7,15 +7,14 @@
 	{{- range $_, $alternativeName := .Data.AlternativeNamesExtension.Names }}
 
         {{- range $ip := $.Data.RecordData.IP }}
-            {{- $escapedIPv4 := replaceAll $ip.V4 "." "_" }}
-            {{- $recordResourceName := printf "record_%s_%s_%s" $alternativeName $escapedIPv4 $resourceSuffix }}
+            {{- $recordResourceName := printf "record_%s_%s_%s" $alternativeName $resourceSuffix }}
 
             resource "hcloud_zone_record" "{{ $recordResourceName }}" {
                 provider = hcloud.hetzner_dns_{{ $resourceSuffix }}
                 zone = data.hcloud_zone.hetzner_zone_{{ $resourceSuffix }}.id
                 name = "{{ $alternativeName }}"
-                value = "{{ $ip.V4 }}"
-                type = "A"
+                value = "{{ $.Data.Hostname }}.{{ $.Data.DNSZone }}"
+                type = "CNAME"
             }
         {{- end }}
 
