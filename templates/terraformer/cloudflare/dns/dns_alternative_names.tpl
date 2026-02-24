@@ -11,7 +11,7 @@
         provider = cloudflare.cloudflare_dns_{{ $resourceSuffix }}
         zone_id = data.cloudflare_zone.cloudflare_zone_{{ $resourceSuffix }}.id
         name = "{{ $alternativeName }}"
-        value = "{{ $.Data.Hostname }}.{{ $.Data.DNSZone }}"
+        content = "{{ $.Data.Hostname }}.{{ $.Data.DNSZone }}"
         type = "CNAME"
         ttl = 300
     }

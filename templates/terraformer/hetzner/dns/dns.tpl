@@ -21,10 +21,11 @@ data "hcloud_zone" "hetzner_zone_{{ $resourceSuffix }}" {
 
   resource "hcloud_zone_record" "{{ $recordResourceName }}" {
     provider = hcloud.hetzner_dns_{{ $resourceSuffix }}
-    zone = data.hcloud_zone.hetzner_zone_{{ $resourceSuffix }}.id
-    name = "{{ $.Data.Hostname }}"
-    value = "{{ $ip.V4 }}"
-    type = "A"
+    zone     = data.hcloud_zone.hetzner_zone_{{ $resourceSuffix }}.id
+    name     = "{{ $.Data.Hostname }}"
+    value    = "{{ $ip.V4 }}"
+    type     = "A"
+    ttl      = "300"
   }
 
 {{- end }}

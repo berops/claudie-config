@@ -9,12 +9,12 @@
 
     resource "hcloud_zone_record" "{{ $recordResourceName }}" {
         provider = hcloud.hetzner_dns_{{ $resourceSuffix }}
-        zone = data.hcloud_zone.hetzner_zone_{{ $resourceSuffix }}.id
-        name = "{{ $alternativeName }}"
-        value = "{{ $.Data.Hostname }}.{{ $.Data.DNSZone }}"
-        type = "CNAME"
+        zone     = data.hcloud_zone.hetzner_zone_{{ $resourceSuffix }}.id
+        name     = "{{ $alternativeName }}"
+        value    = "{{ $.Data.Hostname }}.{{ $.Data.DNSZone }}."
+        type     = "CNAME"
+        ttl      = "300"
     }
-
 
 	output "{{ $clusterID }}_{{ $alternativeName }}_{{ $resourceSuffix }}" {
 	  value = { "{{ $clusterID }}-{{ $alternativeName }}-endpoint" = format("%s.%s", "{{ $alternativeName }}", "{{ $.Data.DNSZone }}")}

@@ -73,7 +73,7 @@ data "cloudflare_zone" "cloudflare_zone_{{ $resourceSuffix }}" {
       provider = cloudflare.cloudflare_dns_{{ $resourceSuffix }}
       zone_id  = data.cloudflare_zone.cloudflare_zone_{{ $resourceSuffix }}.id
       name     = "{{ $.Data.Hostname }}"
-      value    = "{{ $ip.V4 }}"
+      content  = "{{ $ip.V4 }}"
       type     = "A"
       ttl      = 300
     }
