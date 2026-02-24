@@ -24,7 +24,7 @@ resource "hcloud_zone_rrset" "{{ $recordResourceName }}" {
 
   records = [
   {{ range $ip := .Data.RecordData.IP }}
-      { value = "{{ $ip.V4 }}" }
+      { value = "{{ $ip.V4 }}" },
   {{- end }}
   ]
 }
