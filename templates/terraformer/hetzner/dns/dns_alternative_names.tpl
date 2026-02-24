@@ -5,7 +5,7 @@
 
 {{- if hasExtension .Data "AlternativeNamesExtension" }}
 	{{- range $_, $alternativeName := .Data.AlternativeNamesExtension.Names }}
-    {{- $recordResourceName := printf "record_%s_%s_%s" $alternativeName $resourceSuffix }}
+    {{- $recordResourceName := printf "record_%s_%s" $alternativeName $resourceSuffix }}
 
     resource "hcloud_zone_record" "{{ $recordResourceName }}" {
         provider = hcloud.hetzner_dns_{{ $resourceSuffix }}
