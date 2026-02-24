@@ -19,12 +19,16 @@ data "hcloud_zone" "hetzner_zone_{{ $resourceSuffix }}" {
   {{- $escapedIPv4 := replaceAll $ip.V4 "." "_"}}
   {{- $recordResourceName := printf "record_%s_%s" $escapedIPv4 $resourceSuffix }}
 
-  resource "hcloud_zone_record" "{{ $recordResourceName }}" {
+  resource "hcloud_zone_rrset" "{{ $recordResourceName }}" {
     provider = hcloud.hetzner_dns_{{ $resourceSuffix }}
     zone     = data.hcloud_zone.hetzner_zone_{{ $resourceSuffix }}.id
     name     = "{{ $.Data.Hostname }}"
-    value    = "{{ $ip.V4 }}"
     type     = "A"
+    ttl      = 300
+
+    records = [
+        { value = "{{ $ip.V4 }}" }
+    ]
   }
 
 {{- end }}
