@@ -3,29 +3,29 @@
 {{- $resourceSuffix    := printf "%s_%s" $specName $uniqueFingerPrint }}
 {{- $clusterID         := printf "%s-%s" .Data.ClusterName .Data.ClusterHash }}
 
-provider "hetznerdns" {
+provider "hcloud" {
     apitoken = "${file("{{ $specName }}")}"
     alias = "hetzner_dns_{{ $resourceSuffix }}"
 }
 
-data "hetznerdns_zone" "hetzner_zone_{{ $resourceSuffix }}" {
-    provider = hetznerdns.hetzner_dns_{{ $resourceSuffix }}
+data "hcloud_zone" "hetzner_zone_{{ $resourceSuffix }}" {
+    provider = hcloud.hetzner_dns_{{ $resourceSuffix }}
     name = "{{ .Data.DNSZone }}"
 }
 
+
 {{ range $ip := .Data.RecordData.IP }}
 
-    {{- $escapedIPv4 := replaceAll $ip.V4 "." "_"}}
-    {{- $recordResourceName := printf "record_%s_%s" $escapedIPv4 $resourceSuffix }}
+  {{- $escapedIPv4 := replaceAll $ip.V4 "." "_"}}
+  {{- $recordResourceName := printf "record_%s_%s" $escapedIPv4 $resourceSuffix }}
 
-    resource "hetznerdns_record" "{{ $recordResourceName }}" {
-      provider = hetznerdns.hetzner_dns_{{ $resourceSuffix }}
-      zone_id = data.hetznerdns_zone.hetzner_zone_{{ $resourceSuffix }}.id
-      name = "{{ $.Data.Hostname }}"
-      value = "{{ $ip.V4 }}"
-      type = "A"
-      ttl= 300
-    }
+  resource "hcloud_zone_record" "{{ $recordResourceName }}" {
+    provider = hcloud.hetzner_dns_{{ $resourceSuffix }}
+    zone = data.hcloud_zone.hetzner_zone_{{ $resourceSuffix }}.id
+    name = "{{ $.Data.Hostname }}"
+    value = "{{ $ip.V4 }}"
+    type = "A"
+  }
 
 {{- end }}
 
