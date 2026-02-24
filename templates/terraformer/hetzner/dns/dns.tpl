@@ -4,7 +4,7 @@
 {{- $clusterID         := printf "%s-%s" .Data.ClusterName .Data.ClusterHash }}
 
 provider "hcloud" {
-    apitoken = "${file("{{ $specName }}")}"
+    token = "${file("{{ $specName }}")}"
     alias = "hetzner_dns_{{ $resourceSuffix }}"
 }
 
