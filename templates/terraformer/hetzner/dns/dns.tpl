@@ -13,25 +13,22 @@ data "hcloud_zone" "hetzner_zone_{{ $resourceSuffix }}" {
     name = "{{ .Data.DNSZone }}"
 }
 
+{{- $recordResourceName := printf "rrset_%s_%s" $.Data.Hostname $resourceSuffix }}
 
-{{ range $ip := .Data.RecordData.IP }}
+resource "hcloud_zone_rrset" "{{ $recordResourceName }}" {
+  provider = hcloud.hetzner_dns_{{ $resourceSuffix }}
+  zone     = data.hcloud_zone.hetzner_zone_{{ $resourceSuffix }}.id
+  name     = "{{ $.Data.Hostname }}"
+  type     = "A"
+  ttl      = 300
 
-  {{- $escapedIPv4 := replaceAll $ip.V4 "." "_"}}
-  {{- $recordResourceName := printf "record_%s_%s" $escapedIPv4 $resourceSuffix }}
+  records = [
+  {{ range $ip := .Data.RecordData.IP }}
+      { value = "{{ $ip.V4 }}" }
+  {{- end }}
+  ]
+}
 
-  resource "hcloud_zone_rrset" "{{ $recordResourceName }}" {
-    provider = hcloud.hetzner_dns_{{ $resourceSuffix }}
-    zone     = data.hcloud_zone.hetzner_zone_{{ $resourceSuffix }}.id
-    name     = "{{ $.Data.Hostname }}"
-    type     = "A"
-    ttl      = 300
-
-    records = [
-        { value = "{{ $ip.V4 }}" }
-    ]
-  }
-
-{{- end }}
 
 output "{{ $clusterID }}_{{ $resourceSuffix }}" {
   value = { "{{ $clusterID }}-endpoint" = format("%s.%s", "{{ .Data.Hostname }}", "{{ .Data.DNSZone }}")}
