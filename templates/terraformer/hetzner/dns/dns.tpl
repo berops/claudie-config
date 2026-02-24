@@ -25,7 +25,6 @@ data "hcloud_zone" "hetzner_zone_{{ $resourceSuffix }}" {
     name     = "{{ $.Data.Hostname }}"
     value    = "{{ $ip.V4 }}"
     type     = "A"
-    ttl      = "300"
   }
 
 {{- end }}

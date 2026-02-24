@@ -13,7 +13,6 @@
         name     = "{{ $alternativeName }}"
         value    = "{{ $.Data.Hostname }}.{{ $.Data.DNSZone }}."
         type     = "CNAME"
-        ttl      = "300"
     }
 
 	output "{{ $clusterID }}_{{ $alternativeName }}_{{ $resourceSuffix }}" {
