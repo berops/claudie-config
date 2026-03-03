@@ -30,7 +30,7 @@
           instance_type = "{{ $nodepool.Details.ServerType }}"
           ssh_key_id    = cloudrift_ssh_key.{{ $sshKeyResourceName }}.id
 
-          metadata {
+          metadata = {
             startup_commands = <<-SCRIPT
 #!/bin/bash
 # Enable root SSH access
