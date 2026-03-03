@@ -21,9 +21,7 @@ ufw default allow outgoing
 ufw allow 22/tcp
 ufw allow 51820/udp
 {{- if $isKubernetesCluster }}
-  {{- if $K8sHasAPIServer }}
 ufw allow 6443/tcp
-  {{- end }}
 {{- end }}
 {{- if $isLoadbalancerCluster }}
   {{- range $role := $LoadBalancerRoles }}
