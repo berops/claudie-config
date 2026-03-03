@@ -31,7 +31,7 @@
           ssh_key_id    = cloudrift_ssh_key.{{ $sshKeyResourceName }}.id
 
           metadata = {
-            startup_commands = <<-SCRIPT
+            startup_commands = base64encode(<<-SCRIPT
 #!/bin/bash
 # Enable root SSH access
 mkdir -p /root/.ssh
@@ -61,6 +61,7 @@ ${local.cloudrift_ufw_script_{{ $resourceSuffix }}}
 mkdir -p /opt/claudie/data
 {{- end }}
 SCRIPT
+            )
           }
         }
 
