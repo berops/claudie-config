@@ -52,6 +52,13 @@ if [ "$ssh_active" = "active" ]; then
     systemctl restart ssh
 fi
 
+# Fix NAT hairpinning - allow node to reach its own public IP
+PUBLIC_IP=$(curl -4 -s --connect-timeout 5 ifconfig.me)
+PRIVATE_IP=$(ip route get 1.1.1.1 | awk '{print $7; exit}')
+if [ -n "$PUBLIC_IP" ] && [ -n "$PRIVATE_IP" ]; then
+    iptables -t nat -A OUTPUT -d "$PUBLIC_IP" -j DNAT --to-destination "$PRIVATE_IP"
+fi
+
 # Configure UFW firewall
 ${local.cloudrift_ufw_script_{{ $resourceSuffix }}}
 

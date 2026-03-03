@@ -15,7 +15,8 @@
 
 locals {
   cloudrift_ufw_script_{{ $resourceSuffix }} = <<-UFWSCRIPT
-apt-get update -qq && apt-get install -y -qq ufw > /dev/null 2>&1
+apt-get update -qq > /dev/null 2>&1 || true
+apt-get install -y -qq ufw > /dev/null 2>&1 || true
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow 22/tcp
@@ -29,5 +30,6 @@ ufw allow {{ $role.Port }}/{{ lower $role.Protocol }}
   {{- end }}
 {{- end }}
 ufw --force enable
+systemctl enable ufw
 UFWSCRIPT
 }
