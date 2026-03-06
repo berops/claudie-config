@@ -34,6 +34,8 @@ iptables -A INPUT -p tcp --dport 10250 -j ACCEPT
 iptables -A INPUT -p {{ lower $role.Protocol }} --dport {{ $role.Port }} -j ACCEPT
   {{- end }}
 {{- end }}
+# Allow all traffic on WireGuard tunnel interface
+iptables -A INPUT -i wg0 -j ACCEPT
 # Drop everything else
 iptables -A INPUT -j DROP
 # Persist rules across reboots
