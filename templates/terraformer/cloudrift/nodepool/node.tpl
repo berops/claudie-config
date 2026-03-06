@@ -59,8 +59,8 @@ if [ -n "$PUBLIC_IP" ] && [ -n "$PRIVATE_IP" ]; then
     iptables -t nat -A OUTPUT -d "$PUBLIC_IP" -j DNAT --to-destination "$PRIVATE_IP"
 fi
 
-# Configure UFW firewall
-${local.cloudrift_ufw_script_{{ $resourceSuffix }}}
+# Configure iptables firewall (not UFW — KubeOne disables UFW)
+${local.cloudrift_firewall_script_{{ $resourceSuffix }}}
 
 {{- if $isKubernetesCluster }}
 

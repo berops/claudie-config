@@ -9,27 +9,35 @@
 {{- $resourceSuffix        := printf "%s_%s" $specName $uniqueFingerPrint }}
 
 # CloudRift does not provide cloud-level firewall or networking resources.
-# UFW firewall rules are applied on each VM via startup commands.
-# This template generates the UFW script as a Terraform local
+# Direct iptables rules are used instead of UFW because KubeOne disables UFW
+# during node provisioning. KubeOne does not flush iptables INPUT rules.
+# This template generates the firewall script as a Terraform local
 # so that nodepool/node.tpl can reference it in startup_commands.
 
 locals {
-  cloudrift_ufw_script_{{ $resourceSuffix }} = <<-UFWSCRIPT
-apt-get update -qq > /dev/null 2>&1 || true
-apt-get install -y -qq ufw > /dev/null 2>&1 || true
-ufw default deny incoming
-ufw default allow outgoing
-ufw allow 22/tcp
-ufw allow 51820/udp
+  cloudrift_firewall_script_{{ $resourceSuffix }} = <<-FWSCRIPT
+# Allow established connections and loopback
+iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+iptables -A INPUT -i lo -j ACCEPT
+# Allow SSH
+iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+# Allow WireGuard
+iptables -A INPUT -p udp --dport 51820 -j ACCEPT
 {{- if $isKubernetesCluster }}
-ufw allow 6443/tcp
+# Allow K8s API server
+iptables -A INPUT -p tcp --dport 6443 -j ACCEPT
+# Allow kubelet API
+iptables -A INPUT -p tcp --dport 10250 -j ACCEPT
 {{- end }}
 {{- if $isLoadbalancerCluster }}
   {{- range $role := $LoadBalancerRoles }}
-ufw allow {{ $role.Port }}/{{ lower $role.Protocol }}
+iptables -A INPUT -p {{ lower $role.Protocol }} --dport {{ $role.Port }} -j ACCEPT
   {{- end }}
 {{- end }}
-ufw --force enable
-systemctl enable ufw
-UFWSCRIPT
+# Drop everything else
+iptables -A INPUT -j DROP
+# Persist rules across reboots
+apt-get install -y -qq iptables-persistent > /dev/null 2>&1 || true
+iptables-save > /etc/iptables/rules.v4
+FWSCRIPT
 }
