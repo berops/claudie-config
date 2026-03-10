@@ -34,10 +34,16 @@ iptables -A INPUT -p tcp --dport 10250 -j ACCEPT
 iptables -A INPUT -p {{ lower $role.Protocol }} --dport {{ $role.Port }} -j ACCEPT
   {{- end }}
 {{- end }}
+# Allow ICMP
+iptables -A INPUT -p icmp -j ACCEPT
 # Allow all traffic on WireGuard tunnel interface
 iptables -A INPUT -i wg0 -j ACCEPT
-# Drop everything else
-iptables -A INPUT -j DROP
+# Set default policy to drop everything else
+iptables -P INPUT DROP
+# Block all IPv6 traffic
+ip6tables -P INPUT DROP
+ip6tables -P FORWARD DROP
+ip6tables -P OUTPUT DROP
 # Persist rules across reboots
 apt-get install -y -qq iptables-persistent > /dev/null 2>&1 || true
 iptables-save > /etc/iptables/rules.v4
