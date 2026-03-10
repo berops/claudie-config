@@ -40,10 +40,9 @@ iptables -A INPUT -p icmp -j ACCEPT
 iptables -A INPUT -i wg0 -j ACCEPT
 # Set default policy to drop everything else
 iptables -P INPUT DROP
-# Block all IPv6 traffic
+# Block inbound IPv6 traffic
 ip6tables -P INPUT DROP
 ip6tables -P FORWARD DROP
-ip6tables -P OUTPUT DROP
 # Persist rules across reboots
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq iptables-persistent > /dev/null 2>&1 || true
 iptables-save > /etc/iptables/rules.v4
