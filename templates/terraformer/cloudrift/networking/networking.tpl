@@ -45,7 +45,7 @@ ip6tables -P INPUT DROP
 ip6tables -P FORWARD DROP
 ip6tables -P OUTPUT DROP
 # Persist rules across reboots
-apt-get install -y -qq iptables-persistent > /dev/null 2>&1 || true
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq iptables-persistent > /dev/null 2>&1 || true
 iptables-save > /etc/iptables/rules.v4
 FWSCRIPT
 }
