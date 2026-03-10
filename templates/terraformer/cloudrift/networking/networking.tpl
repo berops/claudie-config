@@ -40,7 +40,8 @@ iptables -A INPUT -p icmp -j ACCEPT
 iptables -A INPUT -i wg0 -j ACCEPT
 # Set default policy to drop everything else
 iptables -P INPUT DROP
-# Block inbound IPv6 traffic
+# Block IPv6 traffic but allow loopback (kube-apiserver uses [::1]:6443 internally)
+ip6tables -A INPUT -i lo -j ACCEPT
 ip6tables -P INPUT DROP
 ip6tables -P FORWARD DROP
 # Persist rules across reboots
