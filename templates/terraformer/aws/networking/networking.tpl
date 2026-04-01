@@ -11,6 +11,10 @@
 
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
 
+locals {
+  claudie_ssh_port_{{ $resourceSuffix }} = 22522
+}
+
 # Fetch available availability zones for this region
 data "aws_availability_zones" "available_{{ $resourceSuffix }}" {
   provider = aws.nodepool_{{ $resourceSuffix }}
@@ -89,8 +93,8 @@ resource "aws_security_group_rule" "allow_egress_{{ $resourceSuffix }}" {
 resource "aws_security_group_rule" "allow_ssh_{{ $resourceSuffix }}" {
   provider          = aws.nodepool_{{ $resourceSuffix }}
   type              = "ingress"
-  from_port         = 22
-  to_port           = 22
+  from_port         = local.claudie_ssh_port_{{ $resourceSuffix }}
+  to_port           = local.claudie_ssh_port_{{ $resourceSuffix }}
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.{{ $securityGroupResourceName }}.id

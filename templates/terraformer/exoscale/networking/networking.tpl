@@ -8,6 +8,10 @@
 {{- $K8sHasAPIServer       := .Data.K8sData.HasAPIServer }}
 {{- $resourceSuffix        := printf "%s_%s" $specName $uniqueFingerPrint }}
 
+locals {
+  claudie_ssh_port_{{ $resourceSuffix }} = 22522
+}
+
 {{- $sgResourceName := printf "sg_%s" $resourceSuffix }}
 {{- $sgName         := printf "sg%s%s" $clusterHash $uniqueFingerPrint }}
 
@@ -31,8 +35,8 @@ resource "exoscale_security_group_rule" "ssh_{{ $resourceSuffix }}" {
   security_group_id = exoscale_security_group.{{ $sgResourceName }}.id
   type              = "INGRESS"
   protocol          = "TCP"
-  start_port        = 22
-  end_port          = 22
+  start_port        = local.claudie_ssh_port_{{ $resourceSuffix }}
+  end_port          = local.claudie_ssh_port_{{ $resourceSuffix }}
   cidr              = "0.0.0.0/0"
 }
 

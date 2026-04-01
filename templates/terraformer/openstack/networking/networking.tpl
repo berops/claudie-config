@@ -10,6 +10,11 @@
 {{- range $_, $rn := .Data.RegionNetwork }}
 
   {{- $resourceSuffix := printf "%s_%s_%s" $rn.Region $specName $uniqueFingerPrint }}
+
+  locals {
+    claudie_ssh_port_{{ $resourceSuffix }} = 22522
+  }
+
   {{- $privateNetResourceName  := printf "network_%s_%s"  $resourceSuffix $.Data.ClusterData.ClusterType }}
 
   resource "openstack_networking_network_v2" "{{ $privateNetResourceName }}" {
@@ -89,8 +94,8 @@
     region            = "{{ $rn.Region }}"
     direction         = "ingress"
     ethertype         = "IPv4"
-    port_range_min    = 22
-    port_range_max    = 22
+    port_range_min    = local.claudie_ssh_port_{{ $resourceSuffix }}
+    port_range_max    = local.claudie_ssh_port_{{ $resourceSuffix }}
     protocol          = "tcp"
     remote_ip_prefix  = "0.0.0.0/0"
     security_group_id = openstack_networking_secgroup_v2.{{ $securityGroupResourceName }}.id

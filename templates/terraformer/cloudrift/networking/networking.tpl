@@ -15,12 +15,13 @@
 # so that nodepool/node.tpl can reference it in startup_commands.
 
 locals {
+  claudie_ssh_port_{{ $resourceSuffix }} = 22522
   cloudrift_firewall_script_{{ $resourceSuffix }} = <<-FWSCRIPT
 # Allow established connections and loopback
 iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
 iptables -A INPUT -i lo -j ACCEPT
 # Allow SSH
-iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+iptables -A INPUT -p tcp --dport ${local.claudie_ssh_port_{{ $resourceSuffix }}} -j ACCEPT
 # Allow WireGuard
 iptables -A INPUT -p udp --dport 51820 -j ACCEPT
 {{- if $isKubernetesCluster }}

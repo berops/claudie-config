@@ -81,6 +81,16 @@
 set -euxo pipefail
 # Allow ssh as root
 echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config
+# Configure SSH port
+echo "Port ${local.claudie_ssh_port_{{ $resourceSuffix }}}" >> /etc/ssh/sshd_config
+mkdir -p /etc/systemd/system/ssh.socket.d
+cat <<SSHEOF > /etc/systemd/system/ssh.socket.d/override.conf
+[Socket]
+ListenStream=
+ListenStream=0.0.0.0:${local.claudie_ssh_port_{{ $resourceSuffix }}}
+SSHEOF
+systemctl daemon-reload
+systemctl restart ssh.socket
 
 # The '|| true' part in the following cmd makes sure that this script doesn't fail when there is no sshd service.
 sshd_active=$(systemctl is-active sshd 2>/dev/null || true)
@@ -109,6 +119,16 @@ EOF
 set -euxo pipefail
 # Allow ssh as root
 echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config
+# Configure SSH port
+echo "Port ${local.claudie_ssh_port_{{ $resourceSuffix }}}" >> /etc/ssh/sshd_config
+mkdir -p /etc/systemd/system/ssh.socket.d
+cat <<SSHEOF > /etc/systemd/system/ssh.socket.d/override.conf
+[Socket]
+ListenStream=
+ListenStream=0.0.0.0:${local.claudie_ssh_port_{{ $resourceSuffix }}}
+SSHEOF
+systemctl daemon-reload
+systemctl restart ssh.socket
 
 # The '|| true' part in the following cmd makes sure that this script doesn't fail when there is no sshd service.
 sshd_active=$(systemctl is-active sshd 2>/dev/null || true)
@@ -198,7 +218,7 @@ EOF
       {{- range $node := $nodepool.Nodes }}
         {{- $computeInstanceResourceName  := printf "%s_%s" $node.Name $resourceSuffix }}
 
-        "${google_compute_instance.{{ $computeInstanceResourceName }}.name}" = google_compute_instance.{{ $computeInstanceResourceName }}.network_interface.0.access_config.0.nat_ip
+        "${google_compute_instance.{{ $computeInstanceResourceName }}.name}" = [google_compute_instance.{{ $computeInstanceResourceName }}.network_interface.0.access_config.0.nat_ip, tostring(local.claudie_ssh_port_{{ $resourceSuffix }})]
 
       {{- end }}
       }

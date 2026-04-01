@@ -14,6 +14,7 @@ locals {
     "icmp"   = 1
     "icmpv6" = 58
   }
+  claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }} = 22522
 }
 
 {{- range $_, $region := .Data.Regions }}
@@ -97,8 +98,8 @@ resource "oci_core_default_security_list" "{{ $coreSecurityListResourceName }}" 
     protocol    = "6"
     source      = "0.0.0.0/0"
     tcp_options {
-      min = "22"
-      max = "22"
+      min = local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}
+      max = local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}
     }
     description = "Allow SSH connections"
   }
