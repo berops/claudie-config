@@ -98,7 +98,7 @@ SCRIPT
           instance_type     = "{{ $nodepool.Details.ServerType }}"
           image             = "{{ $nodepool.Details.Image }}"
           hostname          = "{{ $node.Name }}"
-          description       = "Managed by Claudie for cluster {{ $clusterName }}-{{ $clusterHash }}"
+          description       = "Claudie {{ $clusterName }}-{{ $clusterHash }}"
           location          = "{{ $nodepool.Details.Region }}"
           ssh_key_ids       = [verda_ssh_key.{{ $sshKeyResourceName }}.id]
           startup_script_id = verda_startup_script.{{ $startupScriptResourceName }}.id
@@ -110,11 +110,58 @@ SCRIPT
 
     {{- end }}
 
+# WORKAROUND: verda-cloud/terraform-provider-verda returns from verda_instance.Create
+# before Verda assigns the public IP, leaving verda_instance.<n>.ip null in stored
+# state for the rest of the apply. We re-fetch the IP via data.http after a wall-clock
+# wait. Remove this block once the upstream provider patches Create to call
+# waitForInstanceIP. Tracked at https://github.com/berops/claudie/issues/2068.
+
+resource "time_sleep" "wait_for_ips_{{ $nodepool.Name }}_{{ $resourceSuffix }}" {
+  depends_on = [
+    {{- range $node := $nodepool.Nodes }}
+        {{- $instanceResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
+    verda_instance.{{ $instanceResourceName }},
+    {{- end }}
+  ]
+  create_duration = "90s"
+}
+
+data "http" "verda_token_{{ $nodepool.Name }}_{{ $resourceSuffix }}" {
+  depends_on = [time_sleep.wait_for_ips_{{ $nodepool.Name }}_{{ $resourceSuffix }}]
+  url        = "https://api.verda.com/v1/oauth2/token"
+  method     = "POST"
+  request_headers = {
+    "Content-Type" = "application/x-www-form-urlencoded"
+    "user-agent"   = ""
+  }
+  request_body = "grant_type=client_credentials&client_id={{ .Data.Provider.GetVerda.ClientId }}&client_secret=${file("./{{ $specName }}")}&scope=cloud-api-v1"
+}
+
+    {{- range $node := $nodepool.Nodes }}
+        {{- $instanceResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
+
+data "http" "ip_{{ $instanceResourceName }}" {
+  url    = "https://api.verda.com/v1/instances/${verda_instance.{{ $instanceResourceName }}.id}"
+  method = "GET"
+  request_headers = {
+    "Authorization" = "Bearer ${jsondecode(data.http.verda_token_{{ $nodepool.Name }}_{{ $resourceSuffix }}.response_body).access_token}"
+    "user-agent"    = ""
+  }
+  lifecycle {
+    postcondition {
+      condition     = jsondecode(self.response_body).ip != null && jsondecode(self.response_body).ip != ""
+      error_message = "Verda did not assign IP within wait window for instance ${verda_instance.{{ $instanceResourceName }}.id}"
+    }
+  }
+}
+
+    {{- end }}
+
 output "{{ $nodepool.Name }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
   value = {
     {{- range $node := $nodepool.Nodes }}
         {{- $instanceResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
-        "{{ $node.Name }}" = verda_instance.{{ $instanceResourceName }}.ip
+        "{{ $node.Name }}" = jsondecode(data.http.ip_{{ $instanceResourceName }}.response_body).ip
     {{- end }}
   }
 }
