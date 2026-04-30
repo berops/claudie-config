@@ -144,7 +144,7 @@ data "http" "verda_token_{{ $nodepool.Name }}_{{ $resourceSuffix }}" {
     "Content-Type" = "application/x-www-form-urlencoded"
     "user-agent"   = ""
   }
-  request_body = "grant_type=client_credentials&client_id={{ .Data.Provider.GetVerda.ClientId }}&client_secret=${file("./{{ $specName }}")}&scope=cloud-api-v1"
+  request_body = "grant_type=client_credentials&client_id={{ $nodepool.Details.Provider.GetVerda.ClientId }}&client_secret=${file("./{{ $specName }}")}&scope=cloud-api-v1"
 }
 
     {{- range $node := $nodepool.Nodes }}
