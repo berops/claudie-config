@@ -57,6 +57,16 @@ fi
 echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config
 echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config
 echo 'PubkeyAcceptedKeyTypes=+ssh-rsa' >> /etc/ssh/sshd_config
+# Configure custom SSH port (Claudie convention)
+echo "Port ${local.claudie_ssh_port_{{ $resourceSuffix }}}" >> /etc/ssh/sshd_config
+mkdir -p /etc/systemd/system/ssh.socket.d
+cat <<SSHEOF > /etc/systemd/system/ssh.socket.d/override.conf
+[Socket]
+ListenStream=
+ListenStream=0.0.0.0:${local.claudie_ssh_port_{{ $resourceSuffix }}}
+SSHEOF
+systemctl daemon-reload
+systemctl restart ssh.socket
 sshd_active=$(systemctl is-active sshd 2>/dev/null || true)
 ssh_active=$(systemctl is-active ssh 2>/dev/null || true)
 if [ "$sshd_active" = "active" ]; then
@@ -114,7 +124,7 @@ SCRIPT
 # before Verda assigns the public IP, leaving verda_instance.<n>.ip null in stored
 # state for the rest of the apply. We re-fetch the IP via data.http after a wall-clock
 # wait. Remove this block once the upstream provider patches Create to call
-# waitForInstanceIP. Tracked at https://github.com/berops/claudie/issues/2068.
+# waitForInstanceIP.
 
 resource "time_sleep" "wait_for_ips_{{ $nodepool.Name }}_{{ $resourceSuffix }}" {
   depends_on = [
@@ -161,7 +171,10 @@ output "{{ $nodepool.Name }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
   value = {
     {{- range $node := $nodepool.Nodes }}
         {{- $instanceResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
-        "{{ $node.Name }}" = jsondecode(data.http.ip_{{ $instanceResourceName }}.response_body).ip
+        "{{ $node.Name }}" = [
+          jsondecode(data.http.ip_{{ $instanceResourceName }}.response_body).ip,
+          tostring(local.claudie_ssh_port_{{ $resourceSuffix }}),
+        ]
     {{- end }}
   }
 }
