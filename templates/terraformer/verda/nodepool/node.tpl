@@ -139,7 +139,7 @@ resource "time_sleep" "wait_for_ips_{{ $nodepool.Name }}_{{ $resourceSuffix }}" 
     verda_instance.{{ $instanceResourceName }},
     {{- end }}
   ]
-  create_duration = "30s"
+  create_duration = "120s"
 }
 
 data "http" "verda_token_{{ $nodepool.Name }}_{{ $resourceSuffix }}" {
