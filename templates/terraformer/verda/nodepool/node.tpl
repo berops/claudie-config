@@ -4,6 +4,15 @@
 {{- $isKubernetesCluster   := eq .Data.ClusterData.ClusterType "K8s" }}
 {{- $isLoadbalancerCluster := eq .Data.ClusterData.ClusterType "LB" }}
 
+{{- /*
+  Each rendered .tf file is per-provider, so all nodepools in this template
+  share the same Verda provider credentials and baseUrl. We resolve them once
+  from the first nodepool and reuse across the file-level workaround blocks.
+*/ -}}
+{{- $firstNodepool := index .Data.NodePools 0 }}
+{{- $firstSpecName := $firstNodepool.Details.Provider.SpecName }}
+{{- $verdaBaseUrl  := default "https://api.verda.com/v1" $firstNodepool.Details.Provider.GetVerda.GetBaseUrl }}
+
 
 {{- range $nodepool := .Data.NodePools }}
 
@@ -119,6 +128,7 @@ SCRIPT
         }
 
     {{- end }}
+{{- end }}
 
 # WORKAROUND: verda-cloud/terraform-provider-verda returns from verda_instance.Create
 # before Verda assigns the public IP, leaving verda_instance.<n>.ip null in stored
@@ -130,28 +140,36 @@ SCRIPT
 # so the client_secret read via file() and the access_token returned by Verda end
 # up in the cluster state file. Acceptable for now because Claudie stores state in
 # MinIO with encryption-at-rest, and the workaround is temporary.
-{{- $verdaBaseUrl := default "https://api.verda.com/v1" $nodepool.Details.Provider.GetVerda.GetBaseUrl }}
 
-resource "time_sleep" "wait_for_ips_{{ $nodepool.Name }}_{{ $resourceSuffix }}" {
+resource "time_sleep" "wait_for_ips_{{ $uniqueFingerPrint }}" {
   depends_on = [
-    {{- range $node := $nodepool.Nodes }}
-        {{- $instanceResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
+    {{- range $nodepool := .Data.NodePools }}
+        {{- $resourceSuffix := printf "%s_%s" $nodepool.Details.Provider.SpecName $uniqueFingerPrint }}
+        {{- range $node := $nodepool.Nodes }}
+            {{- $instanceResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
     verda_instance.{{ $instanceResourceName }},
+        {{- end }}
     {{- end }}
   ]
   create_duration = "30s"
 }
 
-data "http" "verda_token_{{ $nodepool.Name }}_{{ $resourceSuffix }}" {
-  depends_on = [time_sleep.wait_for_ips_{{ $nodepool.Name }}_{{ $resourceSuffix }}]
+data "http" "verda_token_{{ $uniqueFingerPrint }}" {
+  depends_on = [time_sleep.wait_for_ips_{{ $uniqueFingerPrint }}]
   url        = "{{ $verdaBaseUrl }}/oauth2/token"
   method     = "POST"
   request_headers = {
     "Content-Type" = "application/x-www-form-urlencoded"
     "user-agent"   = ""
   }
-  request_body = "grant_type=client_credentials&client_id={{ $nodepool.Details.Provider.GetVerda.ClientId }}&client_secret=${file("./{{ $specName }}")}&scope=cloud-api-v1"
+  request_body = "grant_type=client_credentials&client_id={{ $firstNodepool.Details.Provider.GetVerda.ClientId }}&client_secret=${file("./{{ $firstSpecName }}")}&scope=cloud-api-v1"
 }
+
+
+{{- range $nodepool := .Data.NodePools }}
+
+{{- $specName       := $nodepool.Details.Provider.SpecName }}
+{{- $resourceSuffix := printf "%s_%s" $specName $uniqueFingerPrint }}
 
     {{- range $node := $nodepool.Nodes }}
         {{- $instanceResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
@@ -160,7 +178,7 @@ data "http" "ip_{{ $instanceResourceName }}" {
   url    = "{{ $verdaBaseUrl }}/instances/${verda_instance.{{ $instanceResourceName }}.id}"
   method = "GET"
   request_headers = {
-    "Authorization" = "Bearer ${jsondecode(data.http.verda_token_{{ $nodepool.Name }}_{{ $resourceSuffix }}.response_body).access_token}"
+    "Authorization" = "Bearer ${jsondecode(data.http.verda_token_{{ $uniqueFingerPrint }}.response_body).access_token}"
     "user-agent"    = ""
   }
   lifecycle {
