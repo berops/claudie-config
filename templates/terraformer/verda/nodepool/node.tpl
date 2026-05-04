@@ -51,7 +51,7 @@
 mkdir -p /root/.ssh
 chmod 700 /root/.ssh
 if [ -f /home/ubuntu/.ssh/authorized_keys ]; then
-    sed -n 's/^.*ssh-rsa/ssh-rsa/p' /home/ubuntu/.ssh/authorized_keys > /root/.ssh/authorized_keys
+    cp /home/ubuntu/.ssh/authorized_keys /root/.ssh/authorized_keys
     chmod 600 /root/.ssh/authorized_keys
 fi
 echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config
