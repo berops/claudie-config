@@ -125,6 +125,12 @@ SCRIPT
 # state for the rest of the apply. We re-fetch the IP via data.http after a wall-clock
 # wait. Remove this block once the upstream provider patches Create to call
 # waitForInstanceIP.
+#
+# Security note: data.http stores request_body and response_body in Terraform state,
+# so the client_secret read via file() and the access_token returned by Verda end
+# up in the cluster state file. Acceptable for now because Claudie stores state in
+# MinIO with encryption-at-rest, and the workaround is temporary.
+{{- $verdaBaseUrl := default "https://api.verda.com/v1" $nodepool.Details.Provider.GetVerda.GetBaseUrl }}
 
 resource "time_sleep" "wait_for_ips_{{ $nodepool.Name }}_{{ $resourceSuffix }}" {
   depends_on = [
@@ -138,7 +144,7 @@ resource "time_sleep" "wait_for_ips_{{ $nodepool.Name }}_{{ $resourceSuffix }}" 
 
 data "http" "verda_token_{{ $nodepool.Name }}_{{ $resourceSuffix }}" {
   depends_on = [time_sleep.wait_for_ips_{{ $nodepool.Name }}_{{ $resourceSuffix }}]
-  url        = "https://api.verda.com/v1/oauth2/token"
+  url        = "{{ $verdaBaseUrl }}/oauth2/token"
   method     = "POST"
   request_headers = {
     "Content-Type" = "application/x-www-form-urlencoded"
@@ -151,7 +157,7 @@ data "http" "verda_token_{{ $nodepool.Name }}_{{ $resourceSuffix }}" {
         {{- $instanceResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
 
 data "http" "ip_{{ $instanceResourceName }}" {
-  url    = "https://api.verda.com/v1/instances/${verda_instance.{{ $instanceResourceName }}.id}"
+  url    = "{{ $verdaBaseUrl }}/instances/${verda_instance.{{ $instanceResourceName }}.id}"
   method = "GET"
   request_headers = {
     "Authorization" = "Bearer ${jsondecode(data.http.verda_token_{{ $nodepool.Name }}_{{ $resourceSuffix }}.response_body).access_token}"
