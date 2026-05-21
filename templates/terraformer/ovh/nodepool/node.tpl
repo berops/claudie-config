@@ -14,21 +14,13 @@
 {{- $sshKeyResourceName := printf "key_%s_%s" $nodepool.Name $resourceSuffix }}
 {{- $sshKeyName         := printf "key-%s-%s-%s" $nodepool.Name $clusterHash $specName }}
 
-    data "ovh_cloud_project_image" "image_{{ $resourceSuffix }}_{{ $nodepool.Name }}" {
-      provider     = ovh.nodepool_{{ $resourceSuffix }}
-      service_name = "{{ $serviceName }}"
-      region       = "{{ $nodepool.Details.Region }}"
-      name         = "{{ $nodepool.Details.Image }}"
-    }
-
-    data "ovh_cloud_project_flavor" "flavor_{{ $resourceSuffix }}_{{ $nodepool.Name }}" {
-      provider     = ovh.nodepool_{{ $resourceSuffix }}
-      service_name = "{{ $serviceName }}"
-      region       = "{{ $nodepool.Details.Region }}"
-      name         = "{{ $nodepool.Details.ServerType }}"
-    }
-
-    resource "ovh_cloud_project_sshkey" "{{ $sshKeyResourceName }}" {
+    # The OVH provider v2.x has no by-name data source for images or flavors.
+    # The InputManifest's `image` and `serverType` fields therefore must be
+    # OVH UUIDs (image_id and flavor_id), not human-readable names. Look them
+    # up once via the OVH CLI or API for your project and region:
+    #   ovhcloud cloud project flavor list --service-name <project-id> --region <region>
+    #   ovhcloud cloud project image list  --service-name <project-id> --region <region>
+    resource "ovh_cloud_project_ssh_key" "{{ $sshKeyResourceName }}" {
       provider     = ovh.nodepool_{{ $resourceSuffix }}
       service_name = "{{ $serviceName }}"
       name         = "{{ $sshKeyName }}"
@@ -37,10 +29,7 @@
 
     {{- range $node := $nodepool.Nodes }}
 
-        {{- $serverResourceName           := printf "%s_%s" $node.Name $resourceSuffix }}
-        {{- $isWorkerNodeWithDiskAttached := and (not $nodepool.IsControl) (gt $nodepool.Details.StorageDiskSize 0) }}
-        {{- $volumeResourceName           := printf "%s_%s_volume" $node.Name $resourceSuffix }}
-        {{- $volumeAttachResourceName     := printf "%s_att" $volumeResourceName }}
+        {{- $serverResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
 
         resource "ovh_cloud_project_instance" "{{ $serverResourceName }}" {
           provider       = ovh.nodepool_{{ $resourceSuffix }}
@@ -50,15 +39,15 @@
           name           = "{{ $node.Name }}"
 
           boot_from {
-            image_id = data.ovh_cloud_project_image.image_{{ $resourceSuffix }}_{{ $nodepool.Name }}.id
+            image_id = "{{ $nodepool.Details.Image }}"
           }
 
           flavor {
-            flavor_id = data.ovh_cloud_project_flavor.flavor_{{ $resourceSuffix }}_{{ $nodepool.Name }}.id
+            flavor_id = "{{ $nodepool.Details.ServerType }}"
           }
 
           ssh_key {
-            name = ovh_cloud_project_sshkey.{{ $sshKeyResourceName }}.name
+            name = ovh_cloud_project_ssh_key.{{ $sshKeyResourceName }}.name
           }
 
           network {
@@ -96,61 +85,14 @@ systemctl restart ssh.socket 2>/dev/null || systemctl restart ssh 2>/dev/null ||
 ${local.ovh_firewall_script_{{ $resourceSuffix }}}
 
 {{- if $isKubernetesCluster }}
-# Create longhorn volume directory
+# Create longhorn volume directory on the OS disk.
+# Note: v1 of the OVH provider integration does not attach a separate Cinder
+# volume (the OVH provider exposes no Terraform resource to attach an existing
+# volume to a running instance). Storage lives on the OS disk for now.
 mkdir -p /opt/claudie/data
-
-    {{- if $isWorkerNodeWithDiskAttached }}
-
-# Mount the Cinder volume.
-# OVH Public Cloud volumes appear under /dev/disk/by-id/ with a virtio- prefix
-# whose serial matches the first 20 characters of the volume UUID (no dashes).
-VOL_ID="${ovh_cloud_project_volume.{{ $volumeResourceName }}.id}"
-SERIAL=$(echo "$VOL_ID" | tr -d '-' | cut -c1-20)
-for i in $(seq 1 60); do
-    if [ -e "/dev/disk/by-id/virtio-$SERIAL" ]; then
-        break
-    fi
-    sleep 1
-done
-disk=$(readlink -f "/dev/disk/by-id/virtio-$SERIAL" 2>/dev/null || true)
-if [ -n "$disk" ] && [ -b "$disk" ]; then
-    if ! blkid "$disk" | grep -q 'TYPE="xfs"'; then
-        mkfs.xfs "$disk"
-    fi
-    if ! grep -qs "$disk" /proc/mounts; then
-        mount "$disk" /opt/claudie/data
-        echo "$disk /opt/claudie/data xfs defaults 0 0" >> /etc/fstab
-    fi
-fi
-    {{- end }}
 {{- end }}
 EOF
         }
-
-        {{- if $isKubernetesCluster }}
-            {{- if $isWorkerNodeWithDiskAttached }}
-
-            {{- $volumeName := printf "%sd" $node.Name }}
-
-            resource "ovh_cloud_project_volume" "{{ $volumeResourceName }}" {
-              provider     = ovh.nodepool_{{ $resourceSuffix }}
-              service_name = "{{ $serviceName }}"
-              region_name  = "{{ $nodepool.Details.Region }}"
-              name         = "{{ $volumeName }}"
-              size         = {{ $nodepool.Details.StorageDiskSize }}
-              type         = "classic"
-            }
-
-            resource "ovh_cloud_project_volume_attached" "{{ $volumeAttachResourceName }}" {
-              provider     = ovh.nodepool_{{ $resourceSuffix }}
-              service_name = "{{ $serviceName }}"
-              region_name  = "{{ $nodepool.Details.Region }}"
-              volume_id    = ovh_cloud_project_volume.{{ $volumeResourceName }}.id
-              instance_id  = ovh_cloud_project_instance.{{ $serverResourceName }}.id
-            }
-
-            {{- end }}
-        {{- end }}
 
     {{- end }}
 
