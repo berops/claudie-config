@@ -104,7 +104,7 @@ output "{{ $nodepool.Name }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
     {{- range $node := $nodepool.Nodes }}
         {{- $serverResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
         "{{ $node.Name }}" = [
-          [for addr in ovh_cloud_project_instance.{{ $serverResourceName }}.addresses : addr.ip if addr.version == 4 && addr.type == "public"][0],
+          [for addr in ovh_cloud_project_instance.{{ $serverResourceName }}.addresses : addr.ip if addr.version == 4][0],
           tostring(local.claudie_ssh_port_{{ $resourceSuffix }})
         ]
     {{- end }}
