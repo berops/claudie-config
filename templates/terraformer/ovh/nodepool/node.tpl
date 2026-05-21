@@ -35,6 +35,9 @@
           provider       = ovh.nodepool_{{ $resourceSuffix }}
           service_name   = "{{ $serviceName }}"
           region         = "{{ $nodepool.Details.Region }}"
+{{- if $nodepool.Details.Zone }}
+          availability_zone = "{{ $nodepool.Details.Zone }}"
+{{- end }}
           billing_period = "hourly"
           name           = "{{ $node.Name }}"
 
