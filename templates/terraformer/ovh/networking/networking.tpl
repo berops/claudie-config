@@ -79,8 +79,10 @@ iptables -P INPUT DROP
 ip6tables -A INPUT -i lo -j ACCEPT
 ip6tables -P INPUT DROP
 ip6tables -P FORWARD DROP
-# Persist rules across reboots
+# Persist rules across reboots (both IPv4 and IPv6, so the default-drop posture survives reboots)
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq iptables-persistent > /dev/null 2>&1 || true
-iptables-save > /etc/iptables/rules.v4
+mkdir -p /etc/iptables
+iptables-save  > /etc/iptables/rules.v4
+ip6tables-save > /etc/iptables/rules.v6
 FWSCRIPT
 }

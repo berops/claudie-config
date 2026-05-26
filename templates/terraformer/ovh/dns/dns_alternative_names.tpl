@@ -12,7 +12,7 @@
         zone      = "{{ $.Data.DNSZone }}"
         subdomain = "{{ $alternativeName }}"
         fieldtype = "CNAME"
-        target    = "{{ $.Data.Hostname }}.{{ $.Data.DNSZone }}."
+        target    = "{{ $.Data.Hostname }}.{{ $.Data.DNSZone }}"
         ttl       = 60
     }
 
