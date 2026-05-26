@@ -3,11 +3,7 @@
 {{- $resourceSuffix    := printf "%s_%s" $specName $uniqueFingerPrint }}
 
 provider "ovh" {
-{{- if .Data.Provider.GetOvh.Endpoint }}
-  endpoint      = "{{ .Data.Provider.GetOvh.Endpoint }}"
-{{- else }}
-  endpoint      = "ovh-eu"
-{{- end }}
+  endpoint      = "{{ .Data.Provider.GetOvh.Endpoint | default "ovh-eu" }}"
   client_id     = "{{ .Data.Provider.GetOvh.ClientId }}"
   client_secret = file("{{ $specName }}")
   alias         = "nodepool_{{ $resourceSuffix }}"
