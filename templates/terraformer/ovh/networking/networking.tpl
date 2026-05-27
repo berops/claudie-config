@@ -61,8 +61,6 @@ iptables -A INPUT -p udp --dport 51820 -j ACCEPT
 # Allow K8s API server
 iptables -A INPUT -p tcp --dport 6443 -j ACCEPT
 {{- end }}
-# Allow kubelet API
-iptables -A INPUT -p tcp --dport 10250 -j ACCEPT
 {{- end }}
 {{- if $isLoadbalancerCluster }}
   {{- range $role := $LoadBalancerRoles }}
