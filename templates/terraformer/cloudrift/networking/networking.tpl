@@ -15,7 +15,11 @@
 # so that nodepool/node.tpl can reference it in startup_commands.
 
 locals {
-  claudie_ssh_port_{{ $resourceSuffix }} = 22522
+  # CloudRift's shared-IP NAT forwards the standard guest SSH port (22) to a
+  # random host port (exposed via port_mappings), so the in-VM sshd must listen
+  # on 22 for the forward to land. node.tpl keys the SSH-port output, the sshd
+  # config, and the firewall rule off this local.
+  claudie_ssh_port_{{ $resourceSuffix }} = 22
   cloudrift_firewall_script_{{ $resourceSuffix }} = <<-FWSCRIPT
 # Allow established connections and loopback
 iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT

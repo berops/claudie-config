@@ -104,4 +104,16 @@ output "{{ $nodepool.Name }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
     {{- end }}
   }
 }
+
+# DEBUG (test-only): raw port_mappings per node so we can see exactly which
+# guest ports CloudRift forwards (e.g. whether WireGuard 51820 is mapped).
+# Terraformer ignores this output; it only reads the nodepool-keyed output above.
+output "debug_portmappings_{{ $nodepool.Name }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
+  value = {
+    {{- range $node := $nodepool.Nodes }}
+        {{- $serverResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
+        "{{ $node.Name }}" = cloudrift_virtual_machine.{{ $serverResourceName }}.port_mappings
+    {{- end }}
+  }
+}
 {{- end }}
