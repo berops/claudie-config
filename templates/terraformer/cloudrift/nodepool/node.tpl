@@ -84,11 +84,23 @@ SCRIPT
 
     {{- end }}
 
+# Output: [public_ip, ssh_port, wireguard_port] per node.
+#
+# For dedicated-IP instances port_mappings is null, so each port falls back to
+# the in-VM listen port (claudie_ssh_port / 51820) reached directly on the public IP.
+#
+# For shared-IP instances CloudRift returns port_mappings ([{host_port, guest_port}]),
+# and we emit the host_port that forwards to the in-VM SSH port and to WireGuard 51820.
+# The guest_port we match on is the port the service actually listens on inside the VM.
 output "{{ $nodepool.Name }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
   value = {
     {{- range $node := $nodepool.Nodes }}
         {{- $serverResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
-        "{{ $node.Name }}" = [cloudrift_virtual_machine.{{ $serverResourceName }}.public_ip, tostring(local.claudie_ssh_port_{{ $resourceSuffix }})]
+        "{{ $node.Name }}" = [
+          cloudrift_virtual_machine.{{ $serverResourceName }}.public_ip,
+          tostring(coalesce(one([for m in try(cloudrift_virtual_machine.{{ $serverResourceName }}.port_mappings, []) : m.host_port if m.guest_port == local.claudie_ssh_port_{{ $resourceSuffix }}]), local.claudie_ssh_port_{{ $resourceSuffix }})),
+          tostring(coalesce(one([for m in try(cloudrift_virtual_machine.{{ $serverResourceName }}.port_mappings, []) : m.host_port if m.guest_port == 51820]), 51820)),
+        ]
     {{- end }}
   }
 }
