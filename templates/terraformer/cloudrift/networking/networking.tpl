@@ -31,8 +31,9 @@ iptables -A INPUT -p udp --dport 51820 -j ACCEPT
 {{- if $isKubernetesCluster }}
 # Allow K8s API server
 iptables -A INPUT -p tcp --dport 6443 -j ACCEPT
-# Allow kubelet API
-iptables -A INPUT -p tcp --dport 10250 -j ACCEPT
+# Kubelet API (10250) is intentionally NOT opened here: control-plane and
+# metrics-server reach the kubelet over the WireGuard mesh (node InternalIP is
+# the wg IP), which the "-i wg0 -j ACCEPT" rule below already permits.
 {{- end }}
 {{- if $isLoadbalancerCluster }}
   {{- range $role := $LoadBalancerRoles }}
