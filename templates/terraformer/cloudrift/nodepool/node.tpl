@@ -84,11 +84,27 @@ SCRIPT
 
     {{- end }}
 
+# Output: [public_ip, ssh_port, wireguard_port] per node.
+#
+# CloudRift's port_mappings entries are {host_port, guest_port} where, despite the
+# names, host_port is the IN-VM service port (22, 80, 443, ...) and guest_port is
+# the externally reachable port on the SHARED public IP (e.g. 60002). So to reach
+# the VM's SSH (in-VM port = claudie_ssh_port) we connect to the public IP on the
+# matching guest_port. CloudRift forwards a fixed set of in-VM ports (22/80/443/
+# 8080/8443); WireGuard's 51820 is NOT forwarded, so it falls back to 51820 and the
+# node relies on initiating the tunnel outbound (PersistentKeepalive).
+#
+# Dedicated-IP instances have empty port_mappings, so both ports fall back to the
+# in-VM listen ports reached directly on the public IP.
 output "{{ $nodepool.Name }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
   value = {
     {{- range $node := $nodepool.Nodes }}
         {{- $serverResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
-        "{{ $node.Name }}" = [cloudrift_virtual_machine.{{ $serverResourceName }}.public_ip, tostring(local.claudie_ssh_port_{{ $resourceSuffix }})]
+        "{{ $node.Name }}" = [
+          cloudrift_virtual_machine.{{ $serverResourceName }}.public_ip,
+          tostring(coalesce(one([for m in try(cloudrift_virtual_machine.{{ $serverResourceName }}.port_mappings, []) : m.guest_port if m.host_port == local.claudie_ssh_port_{{ $resourceSuffix }}]), local.claudie_ssh_port_{{ $resourceSuffix }})),
+          tostring(coalesce(one([for m in try(cloudrift_virtual_machine.{{ $serverResourceName }}.port_mappings, []) : m.guest_port if m.host_port == 51820]), 51820)),
+        ]
     {{- end }}
   }
 }
