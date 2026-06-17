@@ -39,18 +39,31 @@
           description   = "Managed by Claudie for cluster {{ $clusterName }}-{{ $clusterHash }}"
           allow_stopping_for_update = true
 
-          {{- /* GPU Guest Accelerator Configuration */}}
-          {{- if and $nodepool.Details.MachineSpec $nodepool.Details.MachineSpec.NvidiaGpuCount }}
-          {{- if gt $nodepool.Details.MachineSpec.NvidiaGpuCount 0 }}
+          {{- /* GPU + Spot scheduling. A single scheduling block must be emitted. */}}
+          {{- $hasGpu := false }}
+          {{- if $nodepool.Details.MachineSpec }}
+          {{-   if gt $nodepool.Details.MachineSpec.NvidiaGpuCount 0 }}
+          {{-     $hasGpu = true }}
+          {{-   end }}
+          {{- end }}
+
+          {{- if $hasGpu }}
           guest_accelerator {
             type  = "{{ $nodepool.Details.MachineSpec.NvidiaGpuType }}"
             count = {{ $nodepool.Details.MachineSpec.NvidiaGpuCount }}
           }
+          {{- end }}
 
+          {{- if or $hasGpu $nodepool.Details.Spot }}
           scheduling {
+          {{- if $nodepool.Details.Spot }}
+            provisioning_model          = "SPOT"
+            preemptible                 = true
+            automatic_restart           = false
+            instance_termination_action = "DELETE"
+          {{- end }}
             on_host_maintenance = "TERMINATE"
           }
-          {{- end }}
           {{- end }}
 
           network_interface {
