@@ -39,7 +39,10 @@
           description   = "Managed by Claudie for cluster {{ $clusterName }}-{{ $clusterHash }}"
           allow_stopping_for_update = true
 
-          {{- /* GPU + Spot scheduling. A single scheduling block must be emitted. */}}
+          {{- /* GPU + Spot scheduling: emit a single scheduling block. $hasGpu is
+                 built with nested ifs on purpose: Go template 'and' does not
+                 short-circuit, so 'and MachineSpec (gt ... 0)' would nil-deref
+                 when MachineSpec is unset. */}}
           {{- $hasGpu := false }}
           {{- if $nodepool.Details.MachineSpec }}
           {{-   if gt $nodepool.Details.MachineSpec.NvidiaGpuCount 0 }}
