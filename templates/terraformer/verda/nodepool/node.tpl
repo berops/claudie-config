@@ -113,6 +113,10 @@ SCRIPT
           ssh_key_ids       = [verda_ssh_key.{{ $sshKeyResourceName }}.id]
           startup_script_id = verda_startup_script.{{ $startupScriptResourceName }}.id
 
+        {{- if $nodepool.Details.Spot }}
+          is_spot = true
+        {{- end }}
+
         {{- if and $isKubernetesCluster $isWorkerNodeWithDiskAttached }}
           existing_volumes = [verda_volume.{{ $volumeResourceName }}.id]
         {{- end }}
