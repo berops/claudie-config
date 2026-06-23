@@ -72,6 +72,16 @@ resource "aws_key_pair" "{{ $keypairResourceName }}" {
           subnet_id              = aws_subnet.{{ $subnetResourceName }}.id
           vpc_security_group_ids = [aws_security_group.{{ $securityGroupResourceName }}.id]
 
+        {{- if $nodepool.Details.Spot }}
+          instance_market_options {
+            market_type = "spot"
+            spot_options {
+              spot_instance_type             = "one-time"
+              instance_interruption_behavior = "terminate"
+            }
+          }
+        {{- end }}
+
           tags = {
             Name            = "{{ $node.Name }}"
             Claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
