@@ -35,6 +35,12 @@
           zone                  = length(local.azure_zones_{{ $resourceSuffix }}) > 0 ? element(local.azure_zones_{{ $resourceSuffix }}, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16)) : null
         {{- end }}
 
+        {{- if $nodepool.Details.Spot }}
+          priority        = "Spot"
+          eviction_policy = "Delete"
+          max_bid_price   = -1
+        {{- end }}
+
           source_image_reference {
             publisher = split(":", "{{ $nodepool.Details.Image }}")[0]
             offer     = split(":", "{{ $nodepool.Details.Image }}")[1]

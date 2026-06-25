@@ -37,6 +37,15 @@
            }
         {{end}}
 
+        {{- if $nodepool.Details.Spot }}
+          preemptible_instance_config {
+            preemption_action {
+              type                 = "TERMINATE"
+              preserve_boot_volume = false
+            }
+          }
+        {{- end }}
+
           create_vnic_details {
             assign_public_ip  = true
             subnet_id         = oci_core_subnet.{{ $coreSubnetResourceName }}.id
