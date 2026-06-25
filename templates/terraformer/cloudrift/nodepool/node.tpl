@@ -25,6 +25,7 @@
 
         resource "cloudrift_virtual_machine" "{{ $serverResourceName }}" {
           provider      = cloudrift.nodepool_{{ $resourceSuffix }}
+          name          = "{{ $node.Name }}"
           recipe        = "{{ $nodepool.Details.Image }}"
           datacenter    = "{{ $nodepool.Details.Region }}"
           instance_type = "{{ $nodepool.Details.ServerType }}"
