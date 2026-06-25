@@ -25,6 +25,7 @@
 
         resource "cloudrift_virtual_machine" "{{ $serverResourceName }}" {
           provider      = cloudrift.nodepool_{{ $resourceSuffix }}
+          name          = "{{ $node.Name }}"
           recipe        = "{{ $nodepool.Details.Image }}"
           datacenter    = "{{ $nodepool.Details.Region }}"
           instance_type = "{{ $nodepool.Details.ServerType }}"
@@ -100,10 +101,11 @@ output "{{ $nodepool.Name }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
   value = {
     {{- range $node := $nodepool.Nodes }}
         {{- $serverResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
+        {{- $portMappings := printf "cloudrift_virtual_machine.%s.port_mappings" $serverResourceName }}
         "{{ $node.Name }}" = [
           cloudrift_virtual_machine.{{ $serverResourceName }}.public_ip,
-          tostring(coalesce(one([for m in try(cloudrift_virtual_machine.{{ $serverResourceName }}.port_mappings, []) : m.guest_port if m.host_port == local.claudie_ssh_port_{{ $resourceSuffix }}]), local.claudie_ssh_port_{{ $resourceSuffix }})),
-          tostring(coalesce(one([for m in try(cloudrift_virtual_machine.{{ $serverResourceName }}.port_mappings, []) : m.guest_port if m.host_port == 51820]), 51820)),
+          tostring(coalesce(one([for m in ({{ $portMappings }} == null ? [] : {{ $portMappings }}) : m.guest_port if m.host_port == local.claudie_ssh_port_{{ $resourceSuffix }}]), local.claudie_ssh_port_{{ $resourceSuffix }})),
+          tostring(coalesce(one([for m in ({{ $portMappings }} == null ? [] : {{ $portMappings }}) : m.guest_port if m.host_port == 51820]), 51820)),
         ]
     {{- end }}
   }
