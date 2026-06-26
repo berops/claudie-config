@@ -6,8 +6,8 @@
 {{- if hasExtension .Data "AlternativeNamesExtension" }}
 	{{- range $_, $alternativeName := .Data.AlternativeNamesExtension.Names }}
 
-    {{- $escapedAlternativeName := replaceAll $alternativeName "." "_"}}
-    {{- $recordResourceName := printf "record_%s_%s" $escapedAlternativeName $resourceSuffix }}
+    {{- $escapedAlternativeName := SanitizeStringForResourceName $alternativeName }}
+    {{- $recordResourceName     := printf "record_%s_%s" $escapedAlternativeName $resourceSuffix }}
 
     resource "cloudflare_record" "{{ $recordResourceName }}" {
         provider = cloudflare.cloudflare_dns_{{ $resourceSuffix }}
