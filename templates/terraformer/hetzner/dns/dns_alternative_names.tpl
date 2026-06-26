@@ -22,7 +22,7 @@
     }
 
 	output "{{ $clusterID }}_{{ $escapedAlternativeName }}_{{ $resourceSuffix }}" {
-	  value = { "{{ $clusterID }}-{{ $alternativeName }}-endpoint" = trimprefix(format("%s.%s", "{{ $alternativeName }}", "{{ $.Data.DNSZone }}"), "@.")}
+	  value = { "{{ $clusterID }}-{{ $alternativeName }}-endpoint" = format("%s.%s", "{{ $alternativeName }}", "{{ $.Data.DNSZone }}") }
 	}
 
 	{{- end }}
