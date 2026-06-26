@@ -19,7 +19,7 @@
     }
 
 	output "{{ $clusterID }}_{{ $escapedAlternativeName }}_{{ $resourceSuffix }}" {
-	  value = { "{{ $clusterID }}-{{ $alternativeName }}-endpoint" = cloudflare_record.{{ $recordResourceName }}.hostname
+	  value = { "{{ $clusterID }}-{{ $alternativeName }}-endpoint" = cloudflare_record.{{ $recordResourceName }}.hostname }
 	}
 	{{- end }}
 {{- end }}
