@@ -5,7 +5,9 @@
 
 {{- if hasExtension .Data "AlternativeNamesExtension" }}
 	{{- range $_, $alternativeName := .Data.AlternativeNamesExtension.Names }}
-    {{- $recordResourceName := printf "record_%s_%s" $alternativeName $resourceSuffix }}
+
+    {{- $escapedAlternativeName := sanitizeStringForResourceName $alternativeName }}
+    {{- $recordResourceName     := printf "record_%s_%s" $escapedAlternativeName $resourceSuffix }}
 
     resource "ovh_domain_zone_record" "{{ $recordResourceName }}" {
         provider  = ovh.dns_{{ $resourceSuffix }}
@@ -16,7 +18,7 @@
         ttl       = 60
     }
 
-	output "{{ $clusterID }}_{{ $alternativeName }}_{{ $resourceSuffix }}" {
+	output "{{ $clusterID }}_{{ $escapedAlternativeName }}_{{ $resourceSuffix }}" {
 	  value = { "{{ $clusterID }}-{{ $alternativeName }}-endpoint" = format("%s.%s", "{{ $alternativeName }}", "{{ $.Data.DNSZone }}")}
 	}
 
