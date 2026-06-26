@@ -6,7 +6,7 @@
 {{- if hasExtension .Data "AlternativeNamesExtension" }}
 	{{- range $_, $alternativeName := .Data.AlternativeNamesExtension.Names }}
 
-    {{- $escapedAlternativeName := SanitizeStringForResourceName $alternativeName }}
+    {{- $escapedAlternativeName := sanitizeStringForResourceName $alternativeName }}
     {{- $recordResourceName     := printf "record_%s_%s" $escapedAlternativeName $resourceSuffix }}
 
     resource "cloudflare_record" "{{ $recordResourceName }}" {
