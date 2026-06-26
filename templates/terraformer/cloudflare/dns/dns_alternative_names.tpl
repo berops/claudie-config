@@ -18,7 +18,7 @@
         ttl = 300
     }
 
-	output "{{ $clusterID }}_{{ $alternativeName }}_{{ $resourceSuffix }}" {
+	output "{{ $clusterID }}_{{ $escapedAlternativeName }}_{{ $resourceSuffix }}" {
 	  value = { "{{ $clusterID }}-{{ $alternativeName }}-endpoint" = format("%s.%s", "{{ $alternativeName }}", "{{ $.Data.DNSZone }}")}
 	}
 	{{- end }}
