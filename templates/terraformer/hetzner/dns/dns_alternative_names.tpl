@@ -5,7 +5,9 @@
 
 {{- if hasExtension .Data "AlternativeNamesExtension" }}
 	{{- range $_, $alternativeName := .Data.AlternativeNamesExtension.Names }}
-    {{- $recordResourceName := printf "record_%s_%s" $alternativeName $resourceSuffix }}
+
+    {{- $escapedAlternativeName := sanitizeStringForResourceName $alternativeName }}
+    {{- $recordResourceName     := printf "record_%s_%s" $escapedAlternativeName $resourceSuffix }}
 
     resource "hcloud_zone_rrset" "{{ $recordResourceName }}" {
         provider = hcloud.hetzner_dns_{{ $resourceSuffix }}
@@ -19,8 +21,8 @@
         ]
     }
 
-	output "{{ $clusterID }}_{{ $alternativeName }}_{{ $resourceSuffix }}" {
-	  value = { "{{ $clusterID }}-{{ $alternativeName }}-endpoint" = format("%s.%s", "{{ $alternativeName }}", "{{ $.Data.DNSZone }}")}
+	output "{{ $clusterID }}_{{ $escapedAlternativeName }}_{{ $resourceSuffix }}" {
+	  value = { "{{ $clusterID }}-{{ $alternativeName }}-endpoint" = format("%s.%s", "{{ $alternativeName }}", "{{ $.Data.DNSZone }}") }
 	}
 
 	{{- end }}

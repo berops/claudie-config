@@ -5,7 +5,9 @@
 
 {{- if hasExtension .Data "AlternativeNamesExtension" }}
 	{{- range $_, $alternativeName := .Data.AlternativeNamesExtension.Names }}
-    {{- $recordResourceName := printf "record_%s_%s" $alternativeName $resourceSuffix }}
+
+    {{- $escapedAlternativeName := sanitizeStringForResourceName $alternativeName }}
+    {{- $recordResourceName     := printf "record_%s_%s" $escapedAlternativeName $resourceSuffix }}
 
     resource "cloudflare_record" "{{ $recordResourceName }}" {
         provider = cloudflare.cloudflare_dns_{{ $resourceSuffix }}
@@ -16,8 +18,8 @@
         ttl = 300
     }
 
-	output "{{ $clusterID }}_{{ $alternativeName }}_{{ $resourceSuffix }}" {
-	  value = { "{{ $clusterID }}-{{ $alternativeName }}-endpoint" = format("%s.%s", "{{ $alternativeName }}", "{{ $.Data.DNSZone }}")}
+	output "{{ $clusterID }}_{{ $escapedAlternativeName }}_{{ $resourceSuffix }}" {
+	  value = { "{{ $clusterID }}-{{ $alternativeName }}-endpoint" = cloudflare_record.{{ $recordResourceName }}.hostname }
 	}
 	{{- end }}
 {{- end }}

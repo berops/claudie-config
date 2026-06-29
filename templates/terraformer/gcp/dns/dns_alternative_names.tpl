@@ -7,7 +7,10 @@
 {{- if hasExtension .Data "AlternativeNamesExtension" }}
 	{{- range $_, $alternativeName := .Data.AlternativeNamesExtension.Names }}
 
-	resource "google_dns_record_set" "record_{{ $alternativeName }}_{{ $resourceSuffix }}" {
+    {{- $escapedAlternativeName := sanitizeStringForResourceName $alternativeName }}
+    {{- $recordResourceName     := printf "record_%s_%s" $escapedAlternativeName $resourceSuffix }}
+
+	resource "google_dns_record_set" "{{ $recordResourceName }}" {
 	  provider = google.dns_gcp_{{ $resourceSuffix }}
 
 	  name = "{{ $alternativeName }}.${data.google_dns_managed_zone.gcp_zone_{{ $resourceSuffix }}.dns_name}"
@@ -18,8 +21,8 @@
 	  rrdatas = ["{{ $hostname }}.${data.google_dns_managed_zone.gcp_zone_{{ $resourceSuffix }}.dns_name}"]
 	}
 
-	output "{{ $clusterID }}_{{ $alternativeName }}_{{ $resourceSuffix }}" {
-	  value = { "{{ $clusterID }}-{{ $alternativeName }}-endpoint" = google_dns_record_set.record_{{ $alternativeName }}_{{ $resourceSuffix }}.name }
+	output "{{ $clusterID }}_{{ $escapedAlternativeName }}_{{ $resourceSuffix }}" {
+	  value = { "{{ $clusterID }}-{{ $alternativeName }}-endpoint" = trimsuffix(google_dns_record_set.{{ $recordResourceName }}.name, ".") }
 	}
 	{{- end }}
 {{- end }}
