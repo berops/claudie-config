@@ -8,7 +8,7 @@
 {{- $nodepool             := .Data.NodePool }}
 {{- $specName             := $nodepool.Details.Provider.SpecName }}
 {{- $resourceSuffix       := printf "%s_%s" $specName $uniqueFingerPrint }}
-{{- $networking           := .Networking.All }}
+{{- $networking           := .Data.Networking.All }}
 {{- $firewallResourceName := printf "firewall_%s" $resourceSuffix }}
 {{- $firewallId           := index $networking $firewallResourceName }}
 {{- $claudieSshPort       := index $networking (printf "claudie_ssh_port_%s" $resourceSuffix) }}
