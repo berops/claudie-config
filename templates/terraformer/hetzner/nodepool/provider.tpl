@@ -1,4 +1,5 @@
-{{- $specName          := .Data.Provider.SpecName }}
+{{- $nodepool          := .Data.NodePool }}
+{{- $specName          := $nodepool.Details.Provider.SpecName }}
 {{- $uniqueFingerPrint := .Fingerprint }}
 {{- $resourceSuffix    := printf "%s_%s" $specName $uniqueFingerPrint }}
 
