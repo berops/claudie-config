@@ -5,105 +5,123 @@
 {{- $isLoadbalancerCluster := eq .Data.ClusterData.ClusterType "LB" }}
 
 
-{{- range $_, $nodepool := .Data.NodePools }}
-
+{{- $nodepool       := .Data.NodePool }}
 {{- $region         := $nodepool.Details.Region }}
 {{- $specName       := $nodepool.Details.Provider.SpecName }}
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
+{{- $networking     := .Data.Networking.All }}
+{{- $claudieSshPort := index $networking (printf "claudie_ssh_port_%s" $resourceSuffix) }}
 
-    {{- range $_, $node := $nodepool.Nodes }}
+{{- if not $claudieSshPort }}{{ template "node.tpl: missing output 'claudie_ssh_port_<region>_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
 
-        {{- $computeExternalIpResourceName  := printf "%s_%s_external_ip" $node.Name $resourceSuffix }}
-        {{- $computeExternalIpName          := printf "i%s" $node.Name }}
+# Fetch available zones for this region
+data "google_compute_zones" "available_{{ $resourceSuffix }}" {
+  provider = google.nodepool_{{ $resourceSuffix }}
+  region   = "{{ $region }}"
+  status   = "UP"
+}
 
-        resource "google_compute_address" "{{ $computeExternalIpResourceName }}" {
-          provider      = google.nodepool_{{ $resourceSuffix }}
-          name          = "{{ $computeExternalIpName }}"
-          description   = "Managed by Claudie for cluster {{ $clusterName }}-{{ $clusterHash }}"
-        }
+{{- if $isKubernetesCluster }}
 
-        {{- $computeInstanceResourceName  := printf "%s_%s" $node.Name $resourceSuffix }}
-        {{- $computeSubnetResourceName    := printf "%s_%s_subnet" $nodepool.Name $resourceSuffix }}
-        {{- $varStorageDiskName           := printf "gcp_storage_disk_name_%s" $resourceSuffix }}
-        {{- $isWorkerNodeWithDiskAttached := and (not $nodepool.IsControl) (gt $nodepool.Details.StorageDiskSize 0) }}
+variable "gcp_storage_disk_name_{{ $resourceSuffix }}" {
+  default = "storage-disk"
+  type    = string
+}
+{{- end }}{{/* if $isKubernetesCluster */}}
 
-        resource "google_compute_instance" "{{ $computeInstanceResourceName}}" {
-          provider                  = google.nodepool_{{ $resourceSuffix }}
-        {{- if $nodepool.Details.Zone }}
-          zone                      = "{{ $nodepool.Details.Zone }}"
-        {{- else }}
-          zone                      = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16))
-        {{- end }}
-          name                      = "{{ $node.Name }}"
-          machine_type              = "{{ $nodepool.Details.ServerType }}"
-          description   = "Managed by Claudie for cluster {{ $clusterName }}-{{ $clusterHash }}"
-          allow_stopping_for_update = true
+{{- range $_, $node := $nodepool.Nodes }}
 
-          {{- /* GPU + Spot scheduling: emit a single scheduling block. $hasGpu is
-                 built with nested ifs on purpose: Go template 'and' does not
-                 short-circuit, so 'and MachineSpec (gt ... 0)' would nil-deref
-                 when MachineSpec is unset. */}}
-          {{- $hasGpu := false }}
-          {{- if $nodepool.Details.MachineSpec }}
-          {{-   if gt $nodepool.Details.MachineSpec.NvidiaGpuCount 0 }}
-          {{-     $hasGpu = true }}
-          {{-   end }}
-          {{- end }}
+{{- $computeExternalIpResourceName  := printf "%s_%s_external_ip" $node.Name $resourceSuffix }}
+{{- $computeExternalIpName          := printf "i%s" $node.Name }}
 
-          {{- if $hasGpu }}
-          guest_accelerator {
-            type  = "{{ $nodepool.Details.MachineSpec.NvidiaGpuType }}"
-            count = {{ $nodepool.Details.MachineSpec.NvidiaGpuCount }}
-          }
-          {{- end }}
+resource "google_compute_address" "{{ $computeExternalIpResourceName }}" {
+  provider      = google.nodepool_{{ $resourceSuffix }}
+  name          = "{{ $computeExternalIpName }}"
+  description   = "Managed by Claudie for cluster {{ $clusterName }}-{{ $clusterHash }}"
+}
 
-          {{- if or $hasGpu $nodepool.Details.Spot }}
-          scheduling {
-          {{- if $nodepool.Details.Spot }}
-            provisioning_model          = "SPOT"
-            preemptible                 = true
-            automatic_restart           = false
-            instance_termination_action = "DELETE"
-          {{- end }}
-            on_host_maintenance = "TERMINATE"
-          }
-          {{- end }}
+{{- $computeInstanceResourceName  := printf "%s_%s" $node.Name $resourceSuffix }}
+{{- $computeSubnetResourceName    := printf "%s_%s_subnet" $nodepool.Name $resourceSuffix }}
+{{- $varStorageDiskName           := printf "gcp_storage_disk_name_%s" $resourceSuffix }}
+{{- $isWorkerNodeWithDiskAttached := and (not $nodepool.IsControl) (gt $nodepool.Details.StorageDiskSize 0) }}
 
-          network_interface {
-            subnetwork = google_compute_subnetwork.{{ $computeSubnetResourceName }}.self_link
-            access_config {
-              nat_ip = google_compute_address.{{ $computeExternalIpResourceName }}.address
-            }
-          }
+resource "google_compute_instance" "{{ $computeInstanceResourceName}}" {
+  provider                  = google.nodepool_{{ $resourceSuffix }}
+  {{- if $nodepool.Details.Zone }}
+  zone                      = "{{ $nodepool.Details.Zone }}"
+  {{- else }}
+  zone                      = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16))
+  {{- end }}
+  name                      = "{{ $node.Name }}"
+  machine_type              = "{{ $nodepool.Details.ServerType }}"
+  description               = "Managed by Claudie for cluster {{ $clusterName }}-{{ $clusterHash }}"
+  allow_stopping_for_update = true
 
-          metadata = {
-            ssh-keys = "root:${file("./{{ $nodepool.Name }}")}"
-          }
+  {{- /* GPU + Spot scheduling: emit a single scheduling block. $hasGpu is
+         built with nested ifs on purpose: Go template 'and' does not
+         short-circuit, so 'and MachineSpec (gt ... 0)' would nil-deref
+         when MachineSpec is unset. */}}
+  {{- $hasGpu := false }}
+  {{- if $nodepool.Details.MachineSpec }}
+  {{-   if gt $nodepool.Details.MachineSpec.NvidiaGpuCount 0 }}
+  {{-     $hasGpu = true }}
+  {{-   end }}
+  {{- end }}
 
-          labels = {
-            managed-by = "claudie"
-            claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
-          }
+  {{- if $hasGpu }}
+  guest_accelerator {
+    type  = "{{ $nodepool.Details.MachineSpec.NvidiaGpuType }}"
+    count = {{ $nodepool.Details.MachineSpec.NvidiaGpuCount }}
+  }
+  {{- end }}{{/* if $hasGpu */}}
 
-        {{- if $isLoadbalancerCluster }}
-            boot_disk {
-              initialize_params {
-                size = "50"
-                image = "{{ $nodepool.Details.Image }}"
-              }
-            }
-            metadata_startup_script = <<EOF
+  {{- if or $hasGpu $nodepool.Details.Spot }}
+  scheduling {
+    {{- if $nodepool.Details.Spot }}
+    provisioning_model          = "SPOT"
+    preemptible                 = true
+    automatic_restart           = false
+    instance_termination_action = "DELETE"
+    {{- end }}
+    on_host_maintenance = "TERMINATE"
+  }
+  {{- end }}{{/* if or $hasGpu $nodepool.Details.Spot */}}
+
+  network_interface {
+    subnetwork = google_compute_subnetwork.{{ $computeSubnetResourceName }}.self_link
+    access_config {
+      nat_ip = google_compute_address.{{ $computeExternalIpResourceName }}.address
+    }
+  }
+
+  metadata = {
+    ssh-keys = "root:${file("./{{ $nodepool.Name }}")}"
+  }
+
+  labels = {
+    managed-by = "claudie"
+    claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
+  }
+
+  {{- if $isLoadbalancerCluster }}
+  boot_disk {
+    initialize_params {
+      size = "50"
+      image = "{{ $nodepool.Details.Image }}"
+    }
+  }
+  metadata_startup_script = <<EOF
 #!/bin/bash
 set -euxo pipefail
 # Allow ssh as root
 echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config
 # Configure SSH port
-echo "Port ${local.claudie_ssh_port_{{ $resourceSuffix }}}" >> /etc/ssh/sshd_config
+echo "Port {{ $claudieSshPort }}" >> /etc/ssh/sshd_config
 mkdir -p /etc/systemd/system/ssh.socket.d
 cat <<SSHEOF > /etc/systemd/system/ssh.socket.d/override.conf
 [Socket]
 ListenStream=
-ListenStream=0.0.0.0:${local.claudie_ssh_port_{{ $resourceSuffix }}}
+ListenStream=0.0.0.0:{{ $claudieSshPort }}
 SSHEOF
 systemctl daemon-reload
 systemctl restart ssh.socket
@@ -120,28 +138,28 @@ if [ $ssh_active = 'active' ]; then
     systemctl restart ssh
 fi
 EOF
-        {{- end }}
+  {{- end }}{{/* if $isLoadbalancerCluster */}}
 
-        {{- if $isKubernetesCluster }}
-            boot_disk {
-              initialize_params {
-                size = "100"
-                image = "{{ $nodepool.Details.Image }}"
-              }
-            }
+  {{- if $isKubernetesCluster }}
+  boot_disk {
+    initialize_params {
+      size = "100"
+      image = "{{ $nodepool.Details.Image }}"
+    }
+  }
 
-            metadata_startup_script = <<EOF
+  metadata_startup_script = <<EOF
 #!/bin/bash
 set -euxo pipefail
 # Allow ssh as root
 echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config
 # Configure SSH port
-echo "Port ${local.claudie_ssh_port_{{ $resourceSuffix }}}" >> /etc/ssh/sshd_config
+echo "Port {{ $claudieSshPort }}" >> /etc/ssh/sshd_config
 mkdir -p /etc/systemd/system/ssh.socket.d
 cat <<SSHEOF > /etc/systemd/system/ssh.socket.d/override.conf
 [Socket]
 ListenStream=
-ListenStream=0.0.0.0:${local.claudie_ssh_port_{{ $resourceSuffix }}}
+ListenStream=0.0.0.0:{{ $claudieSshPort }}
 SSHEOF
 systemctl daemon-reload
 systemctl restart ssh.socket
@@ -161,8 +179,8 @@ fi
 # Create longhorn volume directory
 mkdir -p /opt/claudie/data
 
-            {{- /* Only Mount disk for Worker nodes that have a non-zero requested disk size */}}
-            {{- if $isWorkerNodeWithDiskAttached }}
+{{- /* Only Mount disk for Worker nodes that have a non-zero requested disk size */}}
+{{- if $isWorkerNodeWithDiskAttached }}
 
 # Mount managed disk only when not mounted yet
 sleep 50
@@ -176,67 +194,66 @@ if ! grep -qs "/dev/$disk" /proc/mounts; then
   echo "/dev/$disk /opt/claudie/data xfs defaults 0 0" >> /etc/fstab
 fi
 
-            {{- end }}
+{{- end }}{{/* if $isWorkerNodeWithDiskAttached */}}
 EOF
 
-           {{- if $isWorkerNodeWithDiskAttached }}
-               # As the storage disk is attached via google_compute_attached_disk,
-               # we must ignore attached_disk property.
-               lifecycle {
-                 ignore_changes = [attached_disk]
-               }
-           {{- end }}
-        {{- end }}
-        }
+  {{-   if $isWorkerNodeWithDiskAttached }}
+  # As the storage disk is attached via google_compute_attached_disk,
+  # we must ignore attached_disk property.
+  lifecycle {
+    ignore_changes = [attached_disk]
+  }
+  {{-   end }}{{/* if $isWorkerNodeWithDiskAttached */}}
+  {{- end }}{{/* if $isKubernetesCluster */}}
+}
 
-        {{- if $isKubernetesCluster }}
-            {{- if $isWorkerNodeWithDiskAttached }}
+{{- if $isKubernetesCluster }}
+{{-   if $isWorkerNodeWithDiskAttached }}
 
-            {{- $computeDiskResourceName          := printf "%s_%s_disk" $node.Name $resourceSuffix }}
-            {{- $computeDiskName                  := printf "%sd" $node.Name }}
-            {{- $computeAttachedDiskResourceName  := printf "%s_%s_disk_att" $node.Name $resourceSuffix }}
+{{- $computeDiskResourceName          := printf "%s_%s_disk" $node.Name $resourceSuffix }}
+{{- $computeDiskName                  := printf "%sd" $node.Name }}
+{{- $computeAttachedDiskResourceName  := printf "%s_%s_disk_att" $node.Name $resourceSuffix }}
 
-            resource "google_compute_disk" "{{ $computeDiskResourceName }}" {
-              provider = google.nodepool_{{ $resourceSuffix }}
-              # suffix 'd' as otherwise the creation of the VM instance and attachment of the disk will fail, if having the same name as the node.
-              name     = "{{ $computeDiskName }}"
-              type     = "pd-ssd"
-            {{- if $nodepool.Details.Zone }}
-              zone     = "{{ $nodepool.Details.Zone }}"
-            {{- else }}
-              zone     = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16))
-            {{- end }}
-              size     = {{ $nodepool.Details.StorageDiskSize }}
+resource "google_compute_disk" "{{ $computeDiskResourceName }}" {
+  provider = google.nodepool_{{ $resourceSuffix }}
+  # suffix 'd' as otherwise the creation of the VM instance and attachment of the disk will fail, if having the same name as the node.
+  name     = "{{ $computeDiskName }}"
+  type     = "pd-ssd"
+  {{- if $nodepool.Details.Zone }}
+  zone     = "{{ $nodepool.Details.Zone }}"
+  {{- else }}
+  zone     = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16))
+  {{- end }}
+  size     = {{ $nodepool.Details.StorageDiskSize }}
 
-              labels = {
-                managed-by = "claudie"
-                claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
-              }
-            }
+  labels = {
+    managed-by = "claudie"
+    claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
+  }
+}
 
-            resource "google_compute_attached_disk" "{{ $computeAttachedDiskResourceName }}" {
-              provider    = google.nodepool_{{ $resourceSuffix }}
-              disk        = google_compute_disk.{{ $computeDiskResourceName }}.id
-              instance    = google_compute_instance.{{ $computeInstanceResourceName }}.id
-            {{- if $nodepool.Details.Zone }}
-              zone        = "{{ $nodepool.Details.Zone }}"
-            {{- else }}
-              zone        = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16))
-            {{- end }}
-              device_name = var.{{ $varStorageDiskName }}
-            }
-            {{- end }}
-        {{- end }}
+resource "google_compute_attached_disk" "{{ $computeAttachedDiskResourceName }}" {
+  provider    = google.nodepool_{{ $resourceSuffix }}
+  disk        = google_compute_disk.{{ $computeDiskResourceName }}.id
+  instance    = google_compute_instance.{{ $computeInstanceResourceName }}.id
+  {{- if $nodepool.Details.Zone }}
+  zone        = "{{ $nodepool.Details.Zone }}"
+  {{- else }}
+  zone        = element(data.google_compute_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16))
+  {{- end }}
+  device_name = var.{{ $varStorageDiskName }}
+}
+
+{{-   end }}{{/* if $isWorkerNodeWithDiskAttached */}}
+{{- end }}{{/* if $isKubernetesCluster */}}
+
+{{- end }}{{/* range $nodepool.Nodes */}}
+
+output "{{ $nodepool.Name }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
+  value = {
+    {{- range $node := $nodepool.Nodes }}
+    {{- $computeInstanceResourceName  := printf "%s_%s" $node.Name $resourceSuffix }}
+    "${google_compute_instance.{{ $computeInstanceResourceName }}.name}" = [google_compute_instance.{{ $computeInstanceResourceName }}.network_interface.0.access_config.0.nat_ip, "{{ $claudieSshPort }}"]
     {{- end }}
-
-    output "{{ $nodepool.Name }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
-      value = {
-      {{- range $node := $nodepool.Nodes }}
-        {{- $computeInstanceResourceName  := printf "%s_%s" $node.Name $resourceSuffix }}
-
-        "${google_compute_instance.{{ $computeInstanceResourceName }}.name}" = [google_compute_instance.{{ $computeInstanceResourceName }}.network_interface.0.access_config.0.nat_ip, tostring(local.claudie_ssh_port_{{ $resourceSuffix }})]
-
-      {{- end }}
-      }
-    }
-{{- end }}
+  }
+}
