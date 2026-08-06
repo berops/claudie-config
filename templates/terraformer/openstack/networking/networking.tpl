@@ -7,13 +7,13 @@
 {{- $LoadBalancerRoles     := .Data.LBData.Roles }}
 {{- $K8sHasAPIServer       := .Data.K8sData.HasAPIServer }}
 
+locals {
+  claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }} = 22522
+}
+
 {{- range $_, $rn := .Data.RegionNetwork }}
 
 {{- $resourceSuffix := printf "%s_%s_%s" $rn.Region $specName $uniqueFingerPrint }}
-
-locals {
-  claudie_ssh_port_{{ $resourceSuffix }} = 22522
-}
 
 {{- $privateNetResourceName := printf "network_%s_%s" $resourceSuffix $.Data.ClusterData.ClusterType }}
 
@@ -94,8 +94,8 @@ resource "openstack_networking_secgroup_rule_v2" "allow_ssh_{{ $resourceSuffix }
   region            = "{{ $rn.Region }}"
   direction         = "ingress"
   ethertype         = "IPv4"
-  port_range_min    = local.claudie_ssh_port_{{ $resourceSuffix }}
-  port_range_max    = local.claudie_ssh_port_{{ $resourceSuffix }}
+  port_range_min    = local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}
+  port_range_max    = local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}
   protocol          = "tcp"
   remote_ip_prefix  = "0.0.0.0/0"
   security_group_id = openstack_networking_secgroup_v2.{{ $securityGroupResourceName }}.id
@@ -167,8 +167,8 @@ output "{{ $securityGroupResourceName }}" {
   value = openstack_networking_secgroup_v2.{{ $securityGroupResourceName }}.name
 }
 
-output "claudie_ssh_port_{{ $resourceSuffix }}" {
-  value = tostring(local.claudie_ssh_port_{{ $resourceSuffix }})
-}
-
 {{- end }}{{/* range .Data.RegionNetwork */}}
+
+output "claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}" {
+  value = tostring(local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }})
+}

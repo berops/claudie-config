@@ -14,6 +14,8 @@ locals {
     "udp"    = "Udp"
     "icmp"   = "Icmp"
   }
+  # SSH port used by Claudie-managed VMs.
+  claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }} = 22522
 }
 
 {{- $basePriority := printf "base_priority_%s_%s" $specName $uniqueFingerPrint }}
@@ -27,11 +29,6 @@ variable "{{ $basePriority }}" {
 
 {{- $sanitisedRegion := replaceAll $region " " "_"}}
 {{- $resourceSuffix  := printf "%s_%s_%s" $sanitisedRegion $specName $uniqueFingerPrint }}
-
-locals {
-  # SSH port used by Claudie-managed VMs.
-  claudie_ssh_port_{{ $resourceSuffix }} = 22522
-}
 
 {{- $resourceGroupResourceName  := printf "rg_%s"     $resourceSuffix }}
 {{- $resourceGroupName          := printf "rg%s%s-%s" $clusterHash $uniqueFingerPrint $sanitisedRegion }}
@@ -79,7 +76,7 @@ resource "azurerm_network_security_group" "{{ $networkSecurityGroupResourceName 
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_range     = local.claudie_ssh_port_{{ $resourceSuffix }}
+    destination_port_range     = local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
@@ -158,8 +155,8 @@ output "{{ $networkSecurityGroupResourceName }}" {
   value = azurerm_network_security_group.{{ $networkSecurityGroupResourceName }}.id
 }
 
-output "claudie_ssh_port_{{ $resourceSuffix }}" {
-  value = tostring(local.claudie_ssh_port_{{ $resourceSuffix }})
-}
-
 {{- end }}{{/* range .Data.Regions */}}
+
+output "claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}" {
+  value = tostring(local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }})
+}

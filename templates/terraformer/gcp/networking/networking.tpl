@@ -7,13 +7,13 @@
 {{- $LoadBalancerRoles     := .Data.LBData.Roles }}
 {{- $K8sHasAPIServer       := .Data.K8sData.HasAPIServer }}
 
+locals {
+  claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }} = 22522
+}
+
 {{- range $_, $region := .Data.Regions }}
 
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
-
-locals {
-  claudie_ssh_port_{{ $resourceSuffix }} = 22522
-}
 
 {{- $computeNetworkResourceName  := printf "network_%s"   $resourceSuffix }}
 {{- $computeNetworkName          := printf "net%s%s-%s"   $clusterHash $uniqueFingerPrint $region }}
@@ -59,7 +59,7 @@ resource "google_compute_firewall" "{{ $computeFirewallResourceName }}" {
 
   allow {
     protocol = "TCP"
-    ports    = [tostring(local.claudie_ssh_port_{{ $resourceSuffix }})]
+    ports    = [tostring(local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }})]
   }
 
   allow {
@@ -75,8 +75,8 @@ output "{{ $computeNetworkResourceName }}" {
   value = google_compute_network.{{ $computeNetworkResourceName }}.self_link
 }
 
-output "claudie_ssh_port_{{ $resourceSuffix }}" {
-  value = tostring(local.claudie_ssh_port_{{ $resourceSuffix }})
-}
-
 {{- end }}{{/* range .Data.Regions */}}
+
+output "claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}" {
+  value = tostring(local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }})
+}

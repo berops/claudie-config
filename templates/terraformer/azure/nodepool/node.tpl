@@ -11,10 +11,10 @@
 {{- $resourceSuffix  := printf "%s_%s_%s" $sanitisedRegion $specName $uniqueFingerPrint }}
 {{- $networking      := .Data.Networking.All }}
 {{- $rgName          := index $networking (printf "rg_%s" $resourceSuffix) }}
-{{- $claudieSshPort  := index $networking (printf "claudie_ssh_port_%s" $resourceSuffix) }}
+{{- $claudieSshPort  := index $networking (printf "claudie_ssh_port_%s_%s" $specName $uniqueFingerPrint) }}
 
 {{- if not $rgName }}{{ template "node.tpl: missing output 'rg_<region>_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
-{{- if not $claudieSshPort }}{{ template "node.tpl: missing output 'claudie_ssh_port_<region>_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
+{{- if not $claudieSshPort }}{{ template "node.tpl: missing output 'claudie_ssh_port_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
 
 # Fetch available zones for this region dynamically
 data "azurerm_location" "location_{{ $resourceSuffix }}" {

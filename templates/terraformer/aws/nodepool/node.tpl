@@ -11,10 +11,10 @@
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
 {{- $networking     := .Data.Networking.All }}
 {{- $sgId           := index $networking (printf "claudie_sg_%s" $resourceSuffix) }}
-{{- $claudieSshPort := index $networking (printf "claudie_ssh_port_%s" $resourceSuffix) }}
+{{- $claudieSshPort := index $networking (printf "claudie_ssh_port_%s_%s" $specName $uniqueFingerPrint) }}
 
 {{- if not $sgId }}{{ template "node.tpl: missing output 'claudie_sg_<region>_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
-{{- if not $claudieSshPort }}{{ template "node.tpl: missing output 'claudie_ssh_port_<region>_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
+{{- if not $claudieSshPort }}{{ template "node.tpl: missing output 'claudie_ssh_port_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
 
 # Fetch available availability zones for this region
 data "aws_availability_zones" "available_{{ $resourceSuffix }}" {

@@ -7,13 +7,13 @@
 {{- $LoadBalancerRoles     := .Data.LBData.Roles }}
 {{- $K8sHasAPIServer       := .Data.K8sData.HasAPIServer }}
 
+locals {
+  claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }} = 22522
+}
+
 {{- range $_, $region := .Data.Regions }}
 
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
-
-locals {
-  claudie_ssh_port_{{ $resourceSuffix }} = 22522
-}
 
 {{- $vpcResourceName  := printf "claudie_vpc_%s"  $resourceSuffix }}
 {{- $vpcName          := printf "vpc%s%s-%s"      $clusterHash $uniqueFingerPrint $region }}
@@ -85,8 +85,8 @@ resource "aws_security_group_rule" "allow_egress_{{ $resourceSuffix }}" {
 resource "aws_security_group_rule" "allow_ssh_{{ $resourceSuffix }}" {
   provider          = aws.networking_{{ $resourceSuffix }}
   type              = "ingress"
-  from_port         = local.claudie_ssh_port_{{ $resourceSuffix }}
-  to_port           = local.claudie_ssh_port_{{ $resourceSuffix }}
+  from_port         = local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}
+  to_port           = local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}
   protocol          = "tcp"
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.{{ $securityGroupResourceName }}.id
@@ -156,8 +156,8 @@ output "{{ $securityGroupResourceName }}" {
   value = aws_security_group.{{ $securityGroupResourceName }}.id
 }
 
-output "claudie_ssh_port_{{ $resourceSuffix }}" {
-  value = tostring(local.claudie_ssh_port_{{ $resourceSuffix }})
-}
-
 {{- end }}{{/* range .Data.Regions */}}
+
+output "claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}" {
+  value = tostring(local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }})
+}
