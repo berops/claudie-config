@@ -12,8 +12,8 @@
 # OVH Public Cloud security groups live in the OpenStack layer; to keep this provider
 # self-contained we configure host-level iptables instead (same approach as CloudRift).
 # KubeOne disables UFW during node provisioning but leaves iptables INPUT rules intact.
-# This template emits the firewall script as a Terraform local so that
-# nodepool/node.tpl can reference it inside the instance's user_data.
+# This template emits the bootstrap and firewall scripts as Terraform locals and
+# exports them as outputs for the nodepool stage to inject into the instance user_data.
 
 locals {
   claudie_ssh_port_{{ $resourceSuffix }} = 22522
@@ -57,16 +57,16 @@ iptables -A INPUT -p tcp --dport ${local.claudie_ssh_port_{{ $resourceSuffix }}}
 # Allow WireGuard
 iptables -A INPUT -p udp --dport 51820 -j ACCEPT
 {{- if $isKubernetesCluster }}
-{{- if $K8sHasAPIServer }}
+{{-   if $K8sHasAPIServer }}
 # Allow K8s API server
 iptables -A INPUT -p tcp --dport 6443 -j ACCEPT
-{{- end }}
-{{- end }}
+{{-   end }}{{/* if $K8sHasAPIServer */}}
+{{- end }}{{/* if $isKubernetesCluster */}}
 {{- if $isLoadbalancerCluster }}
-  {{- range $role := $LoadBalancerRoles }}
+{{-   range $role := $LoadBalancerRoles }}
 iptables -A INPUT -p {{ lower $role.Protocol }} --dport {{ $role.Port }} -j ACCEPT
-  {{- end }}
-{{- end }}
+{{-   end }}{{/* range $LoadBalancerRoles */}}
+{{- end }}{{/* if $isLoadbalancerCluster */}}
 # Allow ICMP
 iptables -A INPUT -p icmp -j ACCEPT
 # Allow all traffic on WireGuard tunnel interface
@@ -83,4 +83,16 @@ mkdir -p /etc/iptables
 iptables-save  > /etc/iptables/rules.v4
 ip6tables-save > /etc/iptables/rules.v6
 FWSCRIPT
+}
+
+output "claudie_ssh_port_{{ $resourceSuffix }}" {
+  value = tostring(local.claudie_ssh_port_{{ $resourceSuffix }})
+}
+
+output "ovh_bootstrap_script_{{ $resourceSuffix }}" {
+  value = local.ovh_bootstrap_script_{{ $resourceSuffix }}
+}
+
+output "ovh_firewall_script_{{ $resourceSuffix }}" {
+  value = local.ovh_firewall_script_{{ $resourceSuffix }}
 }

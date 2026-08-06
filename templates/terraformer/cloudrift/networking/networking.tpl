@@ -11,8 +11,8 @@
 # CloudRift does not provide cloud-level firewall or networking resources.
 # Direct iptables rules are used instead of UFW because KubeOne disables UFW
 # during node provisioning. KubeOne does not flush iptables INPUT rules.
-# This template generates the firewall script as a Terraform local
-# so that nodepool/node.tpl can reference it in startup_commands.
+# This template generates the firewall script as a Terraform local and
+# exports it as an output for the nodepool stage to inject into startup_commands.
 
 locals {
   # CloudRift's shared-IP NAT forwards the standard guest SSH port (22) to a
@@ -34,12 +34,12 @@ iptables -A INPUT -p tcp --dport 6443 -j ACCEPT
 # Kubelet API (10250) is intentionally NOT opened here: control-plane and
 # metrics-server reach the kubelet over the WireGuard mesh (node InternalIP is
 # the wg IP), which the "-i wg0 -j ACCEPT" rule below already permits.
-{{- end }}
+{{- end }}{{/* if $isKubernetesCluster */}}
 {{- if $isLoadbalancerCluster }}
-  {{- range $role := $LoadBalancerRoles }}
+{{-   range $role := $LoadBalancerRoles }}
 iptables -A INPUT -p {{ lower $role.Protocol }} --dport {{ $role.Port }} -j ACCEPT
-  {{- end }}
-{{- end }}
+{{-   end }}{{/* range $LoadBalancerRoles */}}
+{{- end }}{{/* if $isLoadbalancerCluster */}}
 # Allow ICMP
 iptables -A INPUT -p icmp -j ACCEPT
 # Allow all traffic on WireGuard tunnel interface
@@ -54,4 +54,12 @@ ip6tables -P FORWARD DROP
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq iptables-persistent > /dev/null 2>&1 || true
 iptables-save > /etc/iptables/rules.v4
 FWSCRIPT
+}
+
+output "claudie_ssh_port_{{ $resourceSuffix }}" {
+  value = tostring(local.claudie_ssh_port_{{ $resourceSuffix }})
+}
+
+output "cloudrift_firewall_script_{{ $resourceSuffix }}" {
+  value = local.cloudrift_firewall_script_{{ $resourceSuffix }}
 }

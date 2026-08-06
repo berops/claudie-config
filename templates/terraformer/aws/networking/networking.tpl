@@ -15,17 +15,11 @@ locals {
   claudie_ssh_port_{{ $resourceSuffix }} = 22522
 }
 
-# Fetch available availability zones for this region
-data "aws_availability_zones" "available_{{ $resourceSuffix }}" {
-  provider = aws.nodepool_{{ $resourceSuffix }}
-  state    = "available"
-}
-
 {{- $vpcResourceName  := printf "claudie_vpc_%s"  $resourceSuffix }}
 {{- $vpcName          := printf "vpc%s%s-%s"      $clusterHash $uniqueFingerPrint $region }}
 
 resource "aws_vpc" "{{ $vpcResourceName }}" {
-  provider   = aws.nodepool_{{ $resourceSuffix }}
+  provider   = aws.networking_{{ $resourceSuffix }}
   cidr_block = "10.0.0.0/16"
 
   tags = {
@@ -34,12 +28,11 @@ resource "aws_vpc" "{{ $vpcResourceName }}" {
   }
 }
 
-
 {{- $internetGatewayResourceName  := printf "claudie_gateway_%s"   $resourceSuffix }}
 {{- $internetGatewayName          := printf "gtw%s%s-%s"           $clusterHash $uniqueFingerPrint $region }}
 
 resource "aws_internet_gateway" "{{ $internetGatewayResourceName }}" {
-  provider = aws.nodepool_{{ $resourceSuffix }}
+  provider = aws.networking_{{ $resourceSuffix }}
   vpc_id   = aws_vpc.{{ $vpcResourceName }}.id
 
   tags = {
@@ -52,7 +45,7 @@ resource "aws_internet_gateway" "{{ $internetGatewayResourceName }}" {
 {{- $routeTableName          := printf "rt%s%s-%s"                $clusterHash $uniqueFingerPrint $region }}
 
 resource "aws_route_table" "{{ $routeTableResourceName }}" {
-  provider     = aws.nodepool_{{ $resourceSuffix }}
+  provider     = aws.networking_{{ $resourceSuffix }}
   vpc_id       = aws_vpc.{{ $vpcResourceName }}.id
   route {
     cidr_block = "0.0.0.0/0"
@@ -69,7 +62,7 @@ resource "aws_route_table" "{{ $routeTableResourceName }}" {
 {{- $securityGroupName          := printf "sg%s%s-%s"       $clusterHash $uniqueFingerPrint $region }}
 
 resource "aws_security_group" "{{ $securityGroupResourceName }}" {
-  provider               = aws.nodepool_{{ $resourceSuffix }}
+  provider               = aws.networking_{{ $resourceSuffix }}
   vpc_id                 = aws_vpc.{{ $vpcResourceName }}.id
   revoke_rules_on_delete = true
 
@@ -80,7 +73,7 @@ resource "aws_security_group" "{{ $securityGroupResourceName }}" {
 }
 
 resource "aws_security_group_rule" "allow_egress_{{ $resourceSuffix }}" {
-  provider          = aws.nodepool_{{ $resourceSuffix }}
+  provider          = aws.networking_{{ $resourceSuffix }}
   type              = "egress"
   from_port         = 0
   to_port           = 65535
@@ -89,9 +82,8 @@ resource "aws_security_group_rule" "allow_egress_{{ $resourceSuffix }}" {
   security_group_id = aws_security_group.{{ $securityGroupResourceName }}.id
 }
 
-
 resource "aws_security_group_rule" "allow_ssh_{{ $resourceSuffix }}" {
-  provider          = aws.nodepool_{{ $resourceSuffix }}
+  provider          = aws.networking_{{ $resourceSuffix }}
   type              = "ingress"
   from_port         = local.claudie_ssh_port_{{ $resourceSuffix }}
   to_port           = local.claudie_ssh_port_{{ $resourceSuffix }}
@@ -100,10 +92,11 @@ resource "aws_security_group_rule" "allow_ssh_{{ $resourceSuffix }}" {
   security_group_id = aws_security_group.{{ $securityGroupResourceName }}.id
 }
 
-{{- if $isKubernetesCluster  }}
-    {{- if $K8sHasAPIServer }}
+{{- if $isKubernetesCluster }}
+{{-   if $K8sHasAPIServer }}
+
 resource "aws_security_group_rule" "allow_kube_api_{{ $resourceSuffix }}" {
-  provider          = aws.nodepool_{{ $resourceSuffix }}
+  provider          = aws.networking_{{ $resourceSuffix }}
   type              = "ingress"
   from_port         = 6443
   to_port           = 6443
@@ -111,14 +104,15 @@ resource "aws_security_group_rule" "allow_kube_api_{{ $resourceSuffix }}" {
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.{{ $securityGroupResourceName }}.id
 }
-    {{- end }}
-{{- end }}
 
+{{-   end }}{{/* if $K8sHasAPIServer */}}
+{{- end }}{{/* if $isKubernetesCluster */}}
 
 {{- if $isLoadbalancerCluster }}
-    {{- range $role := $LoadBalancerRoles }}
+{{-   range $role := $LoadBalancerRoles }}
+
 resource "aws_security_group_rule" "allow_{{ $role.Port }}_{{ $resourceSuffix }}" {
-  provider          = aws.nodepool_{{ $resourceSuffix }}
+  provider          = aws.networking_{{ $resourceSuffix }}
   type              = "ingress"
   from_port         = {{ $role.Port }}
   to_port           = {{ $role.Port }}
@@ -126,11 +120,12 @@ resource "aws_security_group_rule" "allow_{{ $role.Port }}_{{ $resourceSuffix }}
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.{{ $securityGroupResourceName }}.id
 }
-    {{- end }}
-{{- end }}
+
+{{-   end }}{{/* range $LoadBalancerRoles */}}
+{{- end }}{{/* if $isLoadbalancerCluster */}}
 
 resource "aws_security_group_rule" "allow_wireguard_{{ $resourceSuffix }}" {
-  provider          = aws.nodepool_{{ $resourceSuffix }}
+  provider          = aws.networking_{{ $resourceSuffix }}
   type              = "ingress"
   from_port         = 51820
   to_port           = 51820
@@ -140,7 +135,7 @@ resource "aws_security_group_rule" "allow_wireguard_{{ $resourceSuffix }}" {
 }
 
 resource "aws_security_group_rule" "allow_icmp_{{ $resourceSuffix }}" {
-  provider          = aws.nodepool_{{ $resourceSuffix }}
+  provider          = aws.networking_{{ $resourceSuffix }}
   type              = "ingress"
   from_port         = 8
   to_port           = 0
@@ -148,4 +143,21 @@ resource "aws_security_group_rule" "allow_icmp_{{ $resourceSuffix }}" {
   cidr_blocks       = ["0.0.0.0/0"]
   security_group_id = aws_security_group.{{ $securityGroupResourceName }}.id
 }
-{{- end }}
+
+output "{{ $vpcResourceName }}" {
+  value = aws_vpc.{{ $vpcResourceName }}.id
+}
+
+output "{{ $routeTableResourceName }}" {
+  value = aws_route_table.{{ $routeTableResourceName }}.id
+}
+
+output "{{ $securityGroupResourceName }}" {
+  value = aws_security_group.{{ $securityGroupResourceName }}.id
+}
+
+output "claudie_ssh_port_{{ $resourceSuffix }}" {
+  value = tostring(local.claudie_ssh_port_{{ $resourceSuffix }})
+}
+
+{{- end }}{{/* range .Data.Regions */}}

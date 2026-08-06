@@ -16,12 +16,12 @@ locals {
 {{- $sgName         := printf "sg%s%s" $clusterHash $uniqueFingerPrint }}
 
 resource "exoscale_security_group" "{{ $sgResourceName }}" {
-  provider = exoscale.nodepool_{{ $resourceSuffix }}
+  provider = exoscale.networking_{{ $resourceSuffix }}
   name     = "{{ $sgName }}"
 }
 
 resource "exoscale_security_group_rule" "icmp_{{ $resourceSuffix }}" {
-  provider          = exoscale.nodepool_{{ $resourceSuffix }}
+  provider          = exoscale.networking_{{ $resourceSuffix }}
   security_group_id = exoscale_security_group.{{ $sgResourceName }}.id
   type              = "INGRESS"
   protocol          = "ICMP"
@@ -31,7 +31,7 @@ resource "exoscale_security_group_rule" "icmp_{{ $resourceSuffix }}" {
 }
 
 resource "exoscale_security_group_rule" "ssh_{{ $resourceSuffix }}" {
-  provider          = exoscale.nodepool_{{ $resourceSuffix }}
+  provider          = exoscale.networking_{{ $resourceSuffix }}
   security_group_id = exoscale_security_group.{{ $sgResourceName }}.id
   type              = "INGRESS"
   protocol          = "TCP"
@@ -41,7 +41,7 @@ resource "exoscale_security_group_rule" "ssh_{{ $resourceSuffix }}" {
 }
 
 resource "exoscale_security_group_rule" "wireguard_{{ $resourceSuffix }}" {
-  provider          = exoscale.nodepool_{{ $resourceSuffix }}
+  provider          = exoscale.networking_{{ $resourceSuffix }}
   security_group_id = exoscale_security_group.{{ $sgResourceName }}.id
   type              = "INGRESS"
   protocol          = "UDP"
@@ -51,10 +51,10 @@ resource "exoscale_security_group_rule" "wireguard_{{ $resourceSuffix }}" {
 }
 
 {{- if $isKubernetesCluster }}
-  {{- if $K8sHasAPIServer }}
+{{-   if $K8sHasAPIServer }}
 
 resource "exoscale_security_group_rule" "kube_api_{{ $resourceSuffix }}" {
-  provider          = exoscale.nodepool_{{ $resourceSuffix }}
+  provider          = exoscale.networking_{{ $resourceSuffix }}
   security_group_id = exoscale_security_group.{{ $sgResourceName }}.id
   type              = "INGRESS"
   protocol          = "TCP"
@@ -62,14 +62,15 @@ resource "exoscale_security_group_rule" "kube_api_{{ $resourceSuffix }}" {
   end_port          = 6443
   cidr              = "0.0.0.0/0"
 }
-  {{- end }}
-{{- end }}
+
+{{-   end }}{{/* if $K8sHasAPIServer */}}
+{{- end }}{{/* if $isKubernetesCluster */}}
 
 {{- if $isLoadbalancerCluster }}
-  {{- range $role := $LoadBalancerRoles }}
+{{-   range $role := $LoadBalancerRoles }}
 
 resource "exoscale_security_group_rule" "lb_{{ $role.Port }}_{{ $resourceSuffix }}" {
-  provider          = exoscale.nodepool_{{ $resourceSuffix }}
+  provider          = exoscale.networking_{{ $resourceSuffix }}
   security_group_id = exoscale_security_group.{{ $sgResourceName }}.id
   type              = "INGRESS"
   protocol          = "{{ upper $role.Protocol }}"
@@ -77,5 +78,14 @@ resource "exoscale_security_group_rule" "lb_{{ $role.Port }}_{{ $resourceSuffix 
   end_port          = {{ $role.Port }}
   cidr              = "0.0.0.0/0"
 }
-  {{- end }}
-{{- end }}
+
+{{-   end }}{{/* range $LoadBalancerRoles */}}
+{{- end }}{{/* if $isLoadbalancerCluster */}}
+
+output "{{ $sgResourceName }}" {
+  value = exoscale_security_group.{{ $sgResourceName }}.id
+}
+
+output "claudie_ssh_port_{{ $resourceSuffix }}" {
+  value = tostring(local.claudie_ssh_port_{{ $resourceSuffix }})
+}

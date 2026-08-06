@@ -5,34 +5,39 @@
 {{- $isLoadbalancerCluster := eq .Data.ClusterData.ClusterType "LB" }}
 
 
-{{- range $nodepool := .Data.NodePools }}
-
+{{- $nodepool       := .Data.NodePool }}
 {{- $specName       := $nodepool.Details.Provider.SpecName }}
 {{- $resourceSuffix := printf "%s_%s" $specName $uniqueFingerPrint }}
+{{- $networking     := .Data.Networking.All }}
+{{- $claudieSshPort := index $networking (printf "claudie_ssh_port_%s" $resourceSuffix) }}
+{{- $firewallScript := index $networking (printf "cloudrift_firewall_script_%s" $resourceSuffix) }}
+
+{{- if not $claudieSshPort }}{{ template "node.tpl: missing output 'claudie_ssh_port_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
+{{- if not $firewallScript }}{{ template "node.tpl: missing output 'cloudrift_firewall_script_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
 
 {{- $sshKeyResourceName := printf "key_%s_%s" $nodepool.Name $resourceSuffix }}
 {{- $sshKeyName         := printf "key-%s-%s-%s" $nodepool.Name $clusterHash $specName }}
 
-    resource "cloudrift_ssh_key" "{{ $sshKeyResourceName }}" {
-      provider   = cloudrift.nodepool_{{ $resourceSuffix }}
-      name       = "{{ $sshKeyName }}"
-      public_key = file("./{{ $nodepool.Name }}")
-    }
+resource "cloudrift_ssh_key" "{{ $sshKeyResourceName }}" {
+  provider   = cloudrift.nodepool_{{ $resourceSuffix }}
+  name       = "{{ $sshKeyName }}"
+  public_key = file("./{{ $nodepool.Name }}")
+}
 
-    {{- range $node := $nodepool.Nodes }}
+{{- range $node := $nodepool.Nodes }}
 
-        {{- $serverResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
+{{- $serverResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
 
-        resource "cloudrift_virtual_machine" "{{ $serverResourceName }}" {
-          provider      = cloudrift.nodepool_{{ $resourceSuffix }}
-          name          = "{{ $node.Name }}"
-          recipe        = "{{ $nodepool.Details.Image }}"
-          datacenter    = "{{ $nodepool.Details.Region }}"
-          instance_type = "{{ $nodepool.Details.ServerType }}"
-          ssh_key_id    = cloudrift_ssh_key.{{ $sshKeyResourceName }}.id
+resource "cloudrift_virtual_machine" "{{ $serverResourceName }}" {
+  provider      = cloudrift.nodepool_{{ $resourceSuffix }}
+  name          = "{{ $node.Name }}"
+  recipe        = "{{ $nodepool.Details.Image }}"
+  datacenter    = "{{ $nodepool.Details.Region }}"
+  instance_type = "{{ $nodepool.Details.ServerType }}"
+  ssh_key_id    = cloudrift_ssh_key.{{ $sshKeyResourceName }}.id
 
-          metadata = {
-            startup_commands = base64encode(<<-SCRIPT
+  metadata = {
+    startup_commands = base64encode(<<-SCRIPT
 #!/bin/bash
 # Enable root SSH access
 mkdir -p /root/.ssh
@@ -45,12 +50,12 @@ echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config
 echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config
 echo 'PubkeyAcceptedKeyTypes=+ssh-rsa' >> /etc/ssh/sshd_config
 # Configure SSH port
-echo "Port ${local.claudie_ssh_port_{{ $resourceSuffix }}}" >> /etc/ssh/sshd_config
+echo "Port {{ $claudieSshPort }}" >> /etc/ssh/sshd_config
 mkdir -p /etc/systemd/system/ssh.socket.d
 cat <<SSHEOF > /etc/systemd/system/ssh.socket.d/override.conf
 [Socket]
 ListenStream=
-ListenStream=0.0.0.0:${local.claudie_ssh_port_{{ $resourceSuffix }}}
+ListenStream=0.0.0.0:{{ $claudieSshPort }}
 SSHEOF
 systemctl daemon-reload
 systemctl restart ssh.socket
@@ -71,19 +76,18 @@ if [ -n "$PUBLIC_IP" ] && [ -n "$PRIVATE_IP" ]; then
 fi
 
 # Configure iptables firewall (not UFW — KubeOne disables UFW)
-${local.cloudrift_firewall_script_{{ $resourceSuffix }}}
-
+{{ $firewallScript }}
 {{- if $isKubernetesCluster }}
 
 # Create longhorn volume directory
 mkdir -p /opt/claudie/data
-{{- end }}
+{{- end }}{{/* if $isKubernetesCluster */}}
 SCRIPT
-            )
-          }
-        }
+    )
+  }
+}
 
-    {{- end }}
+{{- end }}{{/* range $nodepool.Nodes */}}
 
 # Output: [public_ip, ssh_port, wireguard_port] per node.
 #
@@ -100,14 +104,13 @@ SCRIPT
 output "{{ $nodepool.Name }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
   value = {
     {{- range $node := $nodepool.Nodes }}
-        {{- $serverResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
-        {{- $portMappings := printf "cloudrift_virtual_machine.%s.port_mappings" $serverResourceName }}
-        "{{ $node.Name }}" = [
-          cloudrift_virtual_machine.{{ $serverResourceName }}.public_ip,
-          tostring(coalesce(one([for m in ({{ $portMappings }} == null ? [] : {{ $portMappings }}) : m.guest_port if m.host_port == local.claudie_ssh_port_{{ $resourceSuffix }}]), local.claudie_ssh_port_{{ $resourceSuffix }})),
-          tostring(coalesce(one([for m in ({{ $portMappings }} == null ? [] : {{ $portMappings }}) : m.guest_port if m.host_port == 51820]), 51820)),
-        ]
+    {{- $serverResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
+    {{- $portMappings := printf "cloudrift_virtual_machine.%s.port_mappings" $serverResourceName }}
+    "{{ $node.Name }}" = [
+      cloudrift_virtual_machine.{{ $serverResourceName }}.public_ip,
+      tostring(coalesce(one([for m in ({{ $portMappings }} == null ? [] : {{ $portMappings }}) : m.guest_port if m.host_port == {{ $claudieSshPort }}]), {{ $claudieSshPort }})),
+      tostring(coalesce(one([for m in ({{ $portMappings }} == null ? [] : {{ $portMappings }}) : m.guest_port if m.host_port == 51820]), 51820)),
+    ]
     {{- end }}
   }
 }
-{{- end }}

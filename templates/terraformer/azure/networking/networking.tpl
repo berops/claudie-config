@@ -16,7 +16,8 @@ locals {
   }
 }
 
-{{- $basePriority  := printf "base_priority_%s_%s" $specName $uniqueFingerPrint }}
+{{- $basePriority := printf "base_priority_%s_%s" $specName $uniqueFingerPrint }}
+
 variable "{{ $basePriority }}" {
   type    = number
   default = 200
@@ -25,18 +26,9 @@ variable "{{ $basePriority }}" {
 {{- range $_, $region := .Data.Regions }}
 
 {{- $sanitisedRegion := replaceAll $region " " "_"}}
-{{- $resourceSuffix := printf "%s_%s_%s" $sanitisedRegion $specName $uniqueFingerPrint }}
-
-# Fetch available zones for this region dynamically
-data "azurerm_location" "location_{{ $resourceSuffix }}" {
-  provider = azurerm.nodepool_{{ $resourceSuffix }}
-  location = "{{ $region }}"
-}
+{{- $resourceSuffix  := printf "%s_%s_%s" $sanitisedRegion $specName $uniqueFingerPrint }}
 
 locals {
-  # Extract logical zones from zone_mappings for uniform distribution when zone is not specified.
-  # Returns empty list if region doesn't support AZs - in that case, zone parameter will be omitted.
-  azure_zones_{{ $resourceSuffix }} = [for zm in data.azurerm_location.location_{{ $resourceSuffix }}.zone_mappings : zm.logical_zone]
   # SSH port used by Claudie-managed VMs.
   claudie_ssh_port_{{ $resourceSuffix }} = 22522
 }
@@ -45,7 +37,7 @@ locals {
 {{- $resourceGroupName          := printf "rg%s%s-%s" $clusterHash $uniqueFingerPrint $sanitisedRegion }}
 
 resource "azurerm_resource_group" "{{ $resourceGroupResourceName }}" {
-  provider = azurerm.nodepool_{{ $resourceSuffix }}
+  provider = azurerm.networking_{{ $resourceSuffix }}
   name     = "{{ $resourceGroupName }}"
   location = "{{ $region }}"
 
@@ -59,7 +51,7 @@ resource "azurerm_resource_group" "{{ $resourceGroupResourceName }}" {
 {{- $virtualNetworkName          := printf "vn%s%s-%s"      $clusterHash $uniqueFingerPrint $sanitisedRegion }}
 
 resource "azurerm_virtual_network" "{{ $virtualNetworkResourceName }}" {
-  provider            = azurerm.nodepool_{{ $resourceSuffix }}
+  provider            = azurerm.networking_{{ $resourceSuffix }}
   name                = "{{ $virtualNetworkName }}"
   address_space       = ["10.0.0.0/16"]
   location            = "{{ $region }}"
@@ -75,7 +67,7 @@ resource "azurerm_virtual_network" "{{ $virtualNetworkResourceName }}" {
 {{- $networkSecurityGroupName          := printf "nsg%s%s-%s"       $clusterHash $uniqueFingerPrint $sanitisedRegion  }}
 
 resource "azurerm_network_security_group" "{{ $networkSecurityGroupResourceName }}" {
-  provider            = azurerm.nodepool_{{ $resourceSuffix }}
+  provider            = azurerm.networking_{{ $resourceSuffix }}
   name                = "{{ $networkSecurityGroupName }}"
   location            = "{{ $region }}"
   resource_group_name = azurerm_resource_group.{{ $resourceGroupResourceName }}.name
@@ -116,8 +108,8 @@ resource "azurerm_network_security_group" "{{ $networkSecurityGroupResourceName 
     destination_address_prefix = "*"
   }
 
-{{- if $isLoadbalancerCluster }}
-  {{- range $i, $role := $LoadBalancerRoles }}
+  {{- if $isLoadbalancerCluster }}
+  {{-   range $i, $role := $LoadBalancerRoles }}
   security_rule {
     name                       = "Allow-{{ $role.Name }}"
     priority                   = var.{{ $basePriority }} + {{ $i }}
@@ -129,11 +121,11 @@ resource "azurerm_network_security_group" "{{ $networkSecurityGroupResourceName 
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
-  {{- end }}
-{{- end }}
+  {{-   end }}{{/* range $LoadBalancerRoles */}}
+  {{- end }}{{/* if $isLoadbalancerCluster */}}
 
-{{- if $isKubernetesCluster }}
-  {{- if $K8sHasAPIServer }}
+  {{- if $isKubernetesCluster }}
+  {{-   if $K8sHasAPIServer }}
   security_rule {
     name                       = "KubeApi"
     priority                   = 103
@@ -145,12 +137,29 @@ resource "azurerm_network_security_group" "{{ $networkSecurityGroupResourceName 
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
-  {{- end }}
-{{- end }}
+  {{-   end }}{{/* if $K8sHasAPIServer */}}
+  {{- end }}{{/* if $isKubernetesCluster */}}
 
   tags = {
     managed-by      = "Claudie"
     claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
   }
 }
-{{- end }}
+
+output "{{ $resourceGroupResourceName }}" {
+  value = azurerm_resource_group.{{ $resourceGroupResourceName }}.name
+}
+
+output "{{ $virtualNetworkResourceName }}" {
+  value = azurerm_virtual_network.{{ $virtualNetworkResourceName }}.name
+}
+
+output "{{ $networkSecurityGroupResourceName }}" {
+  value = azurerm_network_security_group.{{ $networkSecurityGroupResourceName }}.id
+}
+
+output "claudie_ssh_port_{{ $resourceSuffix }}" {
+  value = tostring(local.claudie_ssh_port_{{ $resourceSuffix }})
+}
+
+{{- end }}{{/* range .Data.Regions */}}

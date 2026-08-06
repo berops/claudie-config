@@ -5,47 +5,52 @@
 {{- $isLoadbalancerCluster := eq .Data.ClusterData.ClusterType "LB" }}
 
 
-{{- range $nodepool := .Data.NodePools }}
-
+{{- $nodepool       := .Data.NodePool }}
 {{- $specName       := $nodepool.Details.Provider.SpecName }}
 {{- $resourceSuffix := printf "%s_%s" $specName $uniqueFingerPrint }}
+{{- $networking     := .Data.Networking.All }}
+{{- $claudieSshPort := index $networking (printf "claudie_ssh_port_%s" $resourceSuffix) }}
+{{- $firewallScript := index $networking (printf "verda_firewall_script_%s" $resourceSuffix) }}
+
+{{- if not $claudieSshPort }}{{ template "node.tpl: missing output 'claudie_ssh_port_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
+{{- if not $firewallScript }}{{ template "node.tpl: missing output 'verda_firewall_script_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
 
 {{- $sshKeyResourceName := printf "key_%s_%s" $nodepool.Name $resourceSuffix }}
 {{- $sshKeyName         := printf "key-%s-%s-%s" $nodepool.Name $clusterHash $specName }}
 
-    resource "verda_ssh_key" "{{ $sshKeyResourceName }}" {
-      provider   = verda.nodepool_{{ $resourceSuffix }}
-      name       = "{{ $sshKeyName }}"
-      public_key = file("./{{ $nodepool.Name }}")
-    }
+resource "verda_ssh_key" "{{ $sshKeyResourceName }}" {
+  provider   = verda.nodepool_{{ $resourceSuffix }}
+  name       = "{{ $sshKeyName }}"
+  public_key = file("./{{ $nodepool.Name }}")
+}
 
-    {{- range $node := $nodepool.Nodes }}
+{{- range $node := $nodepool.Nodes }}
 
-        {{- $instanceResourceName        := printf "%s_%s" $node.Name $resourceSuffix }}
-        {{- $startupScriptResourceName   := printf "startup_%s_%s" $node.Name $resourceSuffix }}
-        {{- $startupScriptName           := printf "startup-%s-%s" $node.Name $clusterHash }}
-        {{- $isWorkerNodeWithDiskAttached := and (not $nodepool.IsControl) (gt $nodepool.Details.StorageDiskSize 0) }}
-        {{- $volumeResourceName          := printf "%s_%s_volume" $node.Name $resourceSuffix }}
-        {{- $volumeName                  := printf "vol-%s-%s" $node.Name $clusterHash }}
+{{- $instanceResourceName         := printf "%s_%s" $node.Name $resourceSuffix }}
+{{- $startupScriptResourceName    := printf "startup_%s_%s" $node.Name $resourceSuffix }}
+{{- $startupScriptName            := printf "startup-%s-%s" $node.Name $clusterHash }}
+{{- $isWorkerNodeWithDiskAttached := and (not $nodepool.IsControl) (gt $nodepool.Details.StorageDiskSize 0) }}
+{{- $volumeResourceName           := printf "%s_%s_volume" $node.Name $resourceSuffix }}
+{{- $volumeName                   := printf "vol-%s-%s" $node.Name $clusterHash }}
 
-        {{- if $isKubernetesCluster }}
-            {{- if $isWorkerNodeWithDiskAttached }}
+{{- if $isKubernetesCluster }}
+{{-   if $isWorkerNodeWithDiskAttached }}
 
-            resource "verda_volume" "{{ $volumeResourceName }}" {
-              provider = verda.nodepool_{{ $resourceSuffix }}
-              name     = "{{ $volumeName }}"
-              size     = {{ $nodepool.Details.StorageDiskSize }}
-              type     = "NVMe"
-              location = "{{ $nodepool.Details.Region }}"
-            }
+resource "verda_volume" "{{ $volumeResourceName }}" {
+  provider = verda.nodepool_{{ $resourceSuffix }}
+  name     = "{{ $volumeName }}"
+  size     = {{ $nodepool.Details.StorageDiskSize }}
+  type     = "NVMe"
+  location = "{{ $nodepool.Details.Region }}"
+}
 
-            {{- end }}
-        {{- end }}
+{{-   end }}{{/* if $isWorkerNodeWithDiskAttached */}}
+{{- end }}{{/* if $isKubernetesCluster */}}
 
-        resource "verda_startup_script" "{{ $startupScriptResourceName }}" {
-          provider = verda.nodepool_{{ $resourceSuffix }}
-          name     = "{{ $startupScriptName }}"
-          script   = <<-SCRIPT
+resource "verda_startup_script" "{{ $startupScriptResourceName }}" {
+  provider = verda.nodepool_{{ $resourceSuffix }}
+  name     = "{{ $startupScriptName }}"
+  script   = <<-SCRIPT
 #!/bin/bash
 # Enable root SSH access
 mkdir -p /root/.ssh
@@ -58,12 +63,12 @@ echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config
 echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config
 echo 'PubkeyAcceptedKeyTypes=+ssh-rsa' >> /etc/ssh/sshd_config
 # Configure custom SSH port (Claudie convention)
-echo "Port ${local.claudie_ssh_port_{{ $resourceSuffix }}}" >> /etc/ssh/sshd_config
+echo "Port {{ $claudieSshPort }}" >> /etc/ssh/sshd_config
 mkdir -p /etc/systemd/system/ssh.socket.d
 cat <<SSHEOF > /etc/systemd/system/ssh.socket.d/override.conf
 [Socket]
 ListenStream=
-ListenStream=0.0.0.0:${local.claudie_ssh_port_{{ $resourceSuffix }}}
+ListenStream=0.0.0.0:{{ $claudieSshPort }}
 SSHEOF
 systemctl daemon-reload
 systemctl restart ssh.socket
@@ -77,14 +82,13 @@ if [ "$ssh_active" = "active" ]; then
 fi
 
 # Configure iptables firewall (not UFW, KubeOne disables UFW)
-${local.verda_firewall_script_{{ $resourceSuffix }}}
-
+{{ $firewallScript }}
 {{- if $isKubernetesCluster }}
 
 # Create longhorn volume directory
 mkdir -p /opt/claudie/data
 
-  {{- if $isWorkerNodeWithDiskAttached }}
+{{-   if $isWorkerNodeWithDiskAttached }}
 
 # Mount attached volume only when not mounted yet
 sleep 50
@@ -98,31 +102,31 @@ if [ -n "$disk" ] && ! grep -qs "/dev/$disk" /proc/mounts; then
   echo "/dev/$disk /opt/claudie/data xfs defaults 0 0" >> /etc/fstab
 fi
 
-  {{- end }}
-{{- end }}
+{{-   end }}{{/* if $isWorkerNodeWithDiskAttached */}}
+{{- end }}{{/* if $isKubernetesCluster */}}
 SCRIPT
-        }
+}
 
-        resource "verda_instance" "{{ $instanceResourceName }}" {
-          provider          = verda.nodepool_{{ $resourceSuffix }}
-          instance_type     = "{{ $nodepool.Details.ServerType }}"
-          image             = "{{ $nodepool.Details.Image }}"
-          hostname          = "{{ $node.Name }}"
-          description       = "Claudie {{ $clusterName }}-{{ $clusterHash }}"
-          location          = "{{ $nodepool.Details.Region }}"
-          ssh_key_ids       = [verda_ssh_key.{{ $sshKeyResourceName }}.id]
-          startup_script_id = verda_startup_script.{{ $startupScriptResourceName }}.id
+resource "verda_instance" "{{ $instanceResourceName }}" {
+  provider          = verda.nodepool_{{ $resourceSuffix }}
+  instance_type     = "{{ $nodepool.Details.ServerType }}"
+  image             = "{{ $nodepool.Details.Image }}"
+  hostname          = "{{ $node.Name }}"
+  description       = "Claudie {{ $clusterName }}-{{ $clusterHash }}"
+  location          = "{{ $nodepool.Details.Region }}"
+  ssh_key_ids       = [verda_ssh_key.{{ $sshKeyResourceName }}.id]
+  startup_script_id = verda_startup_script.{{ $startupScriptResourceName }}.id
 
-        {{- if $nodepool.Details.Spot }}
-          is_spot = true
-        {{- end }}
+  {{- if $nodepool.Details.Spot }}
+  is_spot = true
+  {{- end }}
 
-        {{- if and $isKubernetesCluster $isWorkerNodeWithDiskAttached }}
-          existing_volumes = [verda_volume.{{ $volumeResourceName }}.id]
-        {{- end }}
-        }
+  {{- if and $isKubernetesCluster $isWorkerNodeWithDiskAttached }}
+  existing_volumes = [verda_volume.{{ $volumeResourceName }}.id]
+  {{- end }}
+}
 
-    {{- end }}
+{{- end }}{{/* range $nodepool.Nodes */}}
 
 # WORKAROUND: verda-cloud/terraform-provider-verda returns from verda_instance.Create
 # before Verda assigns the public IP, leaving verda_instance.<n>.ip null in stored
@@ -139,7 +143,7 @@ SCRIPT
 resource "time_sleep" "wait_for_ips_{{ $nodepool.Name }}_{{ $resourceSuffix }}" {
   depends_on = [
     {{- range $node := $nodepool.Nodes }}
-        {{- $instanceResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
+    {{- $instanceResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
     verda_instance.{{ $instanceResourceName }},
     {{- end }}
   ]
@@ -157,8 +161,8 @@ data "http" "verda_token_{{ $nodepool.Name }}_{{ $resourceSuffix }}" {
   request_body = "grant_type=client_credentials&client_id={{ $nodepool.Details.Provider.GetVerda.ClientId }}&client_secret=${file("./{{ $specName }}")}&scope=cloud-api-v1"
 }
 
-    {{- range $node := $nodepool.Nodes }}
-        {{- $instanceResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
+{{- range $node := $nodepool.Nodes }}
+{{- $instanceResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
 
 data "http" "ip_{{ $instanceResourceName }}" {
   url    = "{{ $verdaBaseUrl }}/instances/${verda_instance.{{ $instanceResourceName }}.id}"
@@ -175,17 +179,16 @@ data "http" "ip_{{ $instanceResourceName }}" {
   }
 }
 
-    {{- end }}
+{{- end }}{{/* range $nodepool.Nodes */}}
 
 output "{{ $nodepool.Name }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
   value = {
     {{- range $node := $nodepool.Nodes }}
-        {{- $instanceResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
-        "{{ $node.Name }}" = [
-          jsondecode(data.http.ip_{{ $instanceResourceName }}.response_body).ip,
-          tostring(local.claudie_ssh_port_{{ $resourceSuffix }}),
-        ]
+    {{- $instanceResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
+    "{{ $node.Name }}" = [
+      jsondecode(data.http.ip_{{ $instanceResourceName }}.response_body).ip,
+      "{{ $claudieSshPort }}",
+    ]
     {{- end }}
   }
 }
-{{- end }}

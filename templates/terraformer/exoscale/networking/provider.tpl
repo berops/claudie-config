@@ -5,5 +5,5 @@
 provider "exoscale" {
   key    = "{{ .Data.Provider.GetExoscale.ApiKey }}"
   secret = file("{{ $specName }}")
-  alias  = "nodepool_{{ $resourceSuffix }}"
+  alias  = "networking_{{ $resourceSuffix }}"
 }

@@ -2,25 +2,29 @@
 {{- $clusterHash       := .Data.ClusterData.ClusterHash }}
 {{- $uniqueFingerPrint := $.Fingerprint }}
 
-{{- range $i, $nodepool := .Data.NodePools }}
+{{- $nodepool       := .Data.NodePool }}
+{{- $region         := $nodepool.Details.Region }}
+{{- $specName       := $nodepool.Details.Provider.SpecName }}
+{{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
+{{- $networking     := .Data.Networking.All }}
+{{- $vpcId          := index $networking (printf "claudie_vpc_%s" $resourceSuffix) }}
+{{- $routeTableId   := index $networking (printf "claudie_route_table_%s" $resourceSuffix) }}
 
-{{- $region                     := $nodepool.Details.Region }}
-{{- $specName                   := $nodepool.Details.Provider.SpecName }}
-{{- $resourceSuffix             := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
-{{- $vpcResourceName            := printf "claudie_vpc_%s"   $resourceSuffix }}
-{{- $routeTableResourceName     := printf "claudie_route_table_%s"   $resourceSuffix }}
+{{- if not $vpcId }}{{ template "node_networking.tpl: missing output 'claudie_vpc_<region>_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
+{{- if not $routeTableId }}{{ template "node_networking.tpl: missing output 'claudie_route_table_<region>_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
 
 {{- if $nodepool.Details.Zone }}
 {{- /* Zone is specified - use existing single subnet logic */}}
-{{- $subnetResourceName  := printf "%s_%s_subnet" $nodepool.Name $resourceSuffix }}
-{{- $subnetName          := printf "snt-%s-%s-%s" $clusterHash $region $nodepool.Name }}
-{{- $subnetCIDR          := $nodepool.Details.Cidr }}
+
+{{- $subnetResourceName := printf "%s_%s_subnet" $nodepool.Name $resourceSuffix }}
+{{- $subnetName         := printf "snt-%s-%s-%s" $clusterHash $region $nodepool.Name }}
+{{- $subnetCIDR         := $nodepool.Details.Cidr }}
 
 resource "aws_subnet" "{{ $subnetResourceName }}" {
-  provider                = aws.nodepool_{{ $resourceSuffix }}
-  vpc_id                  = aws_vpc.{{ $vpcResourceName }}.id
-  cidr_block              = "{{ $subnetCIDR }}"
-  availability_zone       = "{{ $nodepool.Details.Zone }}"
+  provider          = aws.nodepool_{{ $resourceSuffix }}
+  vpc_id            = "{{ $vpcId }}"
+  cidr_block        = "{{ $subnetCIDR }}"
+  availability_zone = "{{ $nodepool.Details.Zone }}"
 
   tags = {
     Name            = "{{ $subnetName }}"
@@ -28,12 +32,12 @@ resource "aws_subnet" "{{ $subnetResourceName }}" {
   }
 }
 
-{{- $associationResourceName  := printf "%s_%s_rta" $nodepool.Name $resourceSuffix }}
+{{- $associationResourceName := printf "%s_%s_rta" $nodepool.Name $resourceSuffix }}
 
 resource "aws_route_table_association" "{{ $associationResourceName }}" {
   provider       = aws.nodepool_{{ $resourceSuffix }}
   subnet_id      = aws_subnet.{{ $subnetResourceName }}.id
-  route_table_id = aws_route_table.{{ $routeTableResourceName }}.id
+  route_table_id = "{{ $routeTableId }}"
 }
 
 {{- else }}
@@ -47,18 +51,18 @@ resource "aws_route_table_association" "{{ $associationResourceName }}" {
 {{- if gt $nodeCount 64 }}{{- $newbits = 7 }}{{- $maxSubnets = 128 }}{{- end }}{{- /* 128 nodes */}}
 {{- if gt $nodeCount 128 }}{{- $newbits = 8 }}{{- $maxSubnets = 256 }}{{- end }}{{- /* 256 nodes */}}
 
-    {{- range $_, $node := $nodepool.Nodes }}
+{{- range $_, $node := $nodepool.Nodes }}
 
-        {{- $subnetResourceName        := printf "%s_%s_%s_subnet" $nodepool.Name $node.Name $resourceSuffix }}
-        {{- $subnetName                := printf "snt-%s-%s-%s-%s" $clusterHash $region $nodepool.Name $node.Name }}
-        {{- /* Calculate subnet CIDR: base CIDR with node-specific offset */}}
-        {{- /* newbits is calculated dynamically based on node count */}}
+{{- $subnetResourceName := printf "%s_%s_%s_subnet" $nodepool.Name $node.Name $resourceSuffix }}
+{{- $subnetName         := printf "snt-%s-%s-%s-%s" $clusterHash $region $nodepool.Name $node.Name }}
+{{- /* Calculate subnet CIDR: base CIDR with node-specific offset */}}
+{{- /* newbits is calculated dynamically based on node count */}}
 
 resource "aws_subnet" "{{ $subnetResourceName }}" {
-  provider                = aws.nodepool_{{ $resourceSuffix }}
-  vpc_id                  = aws_vpc.{{ $vpcResourceName }}.id
-  cidr_block              = cidrsubnet("{{ $nodepool.Details.Cidr }}", {{ $newbits }}, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % {{ $maxSubnets }})
-  availability_zone       = element(data.aws_availability_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16))
+  provider          = aws.nodepool_{{ $resourceSuffix }}
+  vpc_id            = "{{ $vpcId }}"
+  cidr_block        = cidrsubnet("{{ $nodepool.Details.Cidr }}", {{ $newbits }}, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16) % {{ $maxSubnets }})
+  availability_zone = element(data.aws_availability_zones.available_{{ $resourceSuffix }}.names, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16))
 
   tags = {
     Name            = "{{ $subnetName }}"
@@ -66,14 +70,13 @@ resource "aws_subnet" "{{ $subnetResourceName }}" {
   }
 }
 
-        {{- $associationResourceName  := printf "%s_%s_%s_rta" $nodepool.Name $node.Name $resourceSuffix }}
+{{- $associationResourceName := printf "%s_%s_%s_rta" $nodepool.Name $node.Name $resourceSuffix }}
 
 resource "aws_route_table_association" "{{ $associationResourceName }}" {
   provider       = aws.nodepool_{{ $resourceSuffix }}
   subnet_id      = aws_subnet.{{ $subnetResourceName }}.id
-  route_table_id = aws_route_table.{{ $routeTableResourceName }}.id
+  route_table_id = "{{ $routeTableId }}"
 }
 
-    {{- end }}
-{{- end }}
-{{- end }}
+{{- end }}{{/* range $nodepool.Nodes */}}
+{{- end }}{{/* if $nodepool.Details.Zone */}}

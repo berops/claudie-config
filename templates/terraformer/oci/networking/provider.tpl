@@ -11,6 +11,7 @@ provider "oci" {
   fingerprint       = "{{ $.Data.Provider.GetOci.KeyFingerprint }}"
   private_key_path  = "{{ $specName }}"
   region            = "{{ $region }}"
-  alias             = "nodepool_{{ $resourceSuffix }}"
+  alias             = "networking_{{ $resourceSuffix }}"
 }
-{{- end }}
+
+{{- end }}{{/* range .Data.Regions */}}

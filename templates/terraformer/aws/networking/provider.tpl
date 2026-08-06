@@ -9,7 +9,7 @@ provider "aws" {
   access_key = "{{ $.Data.Provider.GetAws.AccessKey }}"
   secret_key = file("{{ $specName }}")
   region     = "{{ $region }}"
-  alias      = "nodepool_{{ $resourceSuffix }}"
+  alias      = "networking_{{ $resourceSuffix }}"
   default_tags {
     tags = {
       Managed-by = "Claudie"
@@ -17,4 +17,4 @@ provider "aws" {
   }
 }
 
-{{- end}}
+{{- end }}{{/* range .Data.Regions */}}

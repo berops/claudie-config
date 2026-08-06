@@ -4,116 +4,132 @@
 {{- $isKubernetesCluster   := eq .Data.ClusterData.ClusterType "K8s" }}
 {{- $isLoadbalancerCluster := eq .Data.ClusterData.ClusterType "LB" }}
 
-{{- range $i, $nodepool := .Data.NodePools }}
 
+{{- $nodepool        := .Data.NodePool }}
 {{- $sanitisedRegion := replaceAll $nodepool.Details.Region " " "_"}}
-{{- $nodepoolSpecName       := $nodepool.Details.Provider.SpecName }}
-{{- $resourceSuffix := printf "%s_%s_%s" $sanitisedRegion $nodepoolSpecName $uniqueFingerPrint }}
+{{- $specName        := $nodepool.Details.Provider.SpecName }}
+{{- $resourceSuffix  := printf "%s_%s_%s" $sanitisedRegion $specName $uniqueFingerPrint }}
+{{- $networking      := .Data.Networking.All }}
+{{- $rgName          := index $networking (printf "rg_%s" $resourceSuffix) }}
+{{- $claudieSshPort  := index $networking (printf "claudie_ssh_port_%s" $resourceSuffix) }}
 
-    {{- range $_, $node := $nodepool.Nodes }}
+{{- if not $rgName }}{{ template "node.tpl: missing output 'rg_<region>_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
+{{- if not $claudieSshPort }}{{ template "node.tpl: missing output 'claudie_ssh_port_<region>_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
 
-        {{- $virtualMachineResourceName   := printf "%s_%s" $node.Name $resourceSuffix }}
-        {{- $resourceGroupResourceName    := printf "rg_%s"   $resourceSuffix }}
-        {{- $networkInterfaceResourceName := printf "%s_%s_ni" $node.Name $resourceSuffix }}
-        {{- $isWorkerNodeWithDiskAttached := and (not $nodepool.IsControl) (gt $nodepool.Details.StorageDiskSize 0) }}
-        {{- $vmDiskAttachmentResourceName := printf "%s_%s_disk_att" $node.Name $resourceSuffix }}
-        {{- $vmDiskResourceName           := printf "%s_%s_disk" $node.Name $resourceSuffix }}
-        {{- $vmDiskName                   := printf "%sd" $node.Name }}
+# Fetch available zones for this region dynamically
+data "azurerm_location" "location_{{ $resourceSuffix }}" {
+  provider = azurerm.nodepool_{{ $resourceSuffix }}
+  location = "{{ $nodepool.Details.Region }}"
+}
 
+locals {
+  # Extract logical zones from zone_mappings for uniform distribution when zone is not specified.
+  # Returns empty list if region doesn't support AZs - in that case, zone parameter will be omitted.
+  azure_zones_{{ $resourceSuffix }} = [for zm in data.azurerm_location.location_{{ $resourceSuffix }}.zone_mappings : zm.logical_zone]
+}
 
-        resource "azurerm_linux_virtual_machine" "{{ $virtualMachineResourceName }}" {
-          provider              = azurerm.nodepool_{{ $resourceSuffix }}
-          name                  = "{{ $node.Name }}"
-          location              = "{{ $nodepool.Details.Region }}"
-          resource_group_name   = azurerm_resource_group.{{ $resourceGroupResourceName }}.name
-          network_interface_ids = [azurerm_network_interface.{{ $networkInterfaceResourceName }}.id]
-          size                  = "{{$nodepool.Details.ServerType}}"
-        {{- if $nodepool.Details.Zone }}
-          zone                  = "{{$nodepool.Details.Zone}}"
-        {{- else }}
-          # Zone is only set if the region supports availability zones
-          zone                  = length(local.azure_zones_{{ $resourceSuffix }}) > 0 ? element(local.azure_zones_{{ $resourceSuffix }}, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16)) : null
-        {{- end }}
+{{- range $_, $node := $nodepool.Nodes }}
 
-        {{- if $nodepool.Details.Spot }}
-          priority        = "Spot"
-          eviction_policy = "Delete"
-          max_bid_price   = -1
-        {{- end }}
+{{- $virtualMachineResourceName   := printf "%s_%s" $node.Name $resourceSuffix }}
+{{- $networkInterfaceResourceName := printf "%s_%s_ni" $node.Name $resourceSuffix }}
+{{- $isWorkerNodeWithDiskAttached := and (not $nodepool.IsControl) (gt $nodepool.Details.StorageDiskSize 0) }}
+{{- $vmDiskAttachmentResourceName := printf "%s_%s_disk_att" $node.Name $resourceSuffix }}
+{{- $vmDiskResourceName           := printf "%s_%s_disk" $node.Name $resourceSuffix }}
+{{- $vmDiskName                   := printf "%sd" $node.Name }}
 
-          source_image_reference {
-            publisher = split(":", "{{ $nodepool.Details.Image }}")[0]
-            offer     = split(":", "{{ $nodepool.Details.Image }}")[1]
-            sku       = split(":", "{{ $nodepool.Details.Image }}")[2]
-            version   = split(":", "{{ $nodepool.Details.Image }}")[3]
-          }
+resource "azurerm_linux_virtual_machine" "{{ $virtualMachineResourceName }}" {
+  provider              = azurerm.nodepool_{{ $resourceSuffix }}
+  name                  = "{{ $node.Name }}"
+  location              = "{{ $nodepool.Details.Region }}"
+  resource_group_name   = "{{ $rgName }}"
+  network_interface_ids = [azurerm_network_interface.{{ $networkInterfaceResourceName }}.id]
+  size                  = "{{ $nodepool.Details.ServerType }}"
+  {{- if $nodepool.Details.Zone }}
+  zone                  = "{{ $nodepool.Details.Zone }}"
+  {{- else }}
+  # Zone is only set if the region supports availability zones
+  zone                  = length(local.azure_zones_{{ $resourceSuffix }}) > 0 ? element(local.azure_zones_{{ $resourceSuffix }}, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16)) : null
+  {{- end }}
 
-          disable_password_authentication = true
-          admin_ssh_key {
-            public_key = file("./{{ $nodepool.Name }}")
-            username   = "claudie"
-          }
+  {{- if $nodepool.Details.Spot }}
+  priority        = "Spot"
+  eviction_policy = "Delete"
+  max_bid_price   = -1
+  {{- end }}
 
-          computer_name  = "{{ $node.Name }}"
-          admin_username = "claudie"
+  source_image_reference {
+    publisher = split(":", "{{ $nodepool.Details.Image }}")[0]
+    offer     = split(":", "{{ $nodepool.Details.Image }}")[1]
+    sku       = split(":", "{{ $nodepool.Details.Image }}")[2]
+    version   = split(":", "{{ $nodepool.Details.Image }}")[3]
+  }
 
-          tags = {
-            managed-by      = "Claudie"
-            claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
-          }
+  disable_password_authentication = true
+  admin_ssh_key {
+    public_key = file("./{{ $nodepool.Name }}")
+    username   = "claudie"
+  }
 
-        {{- if $isLoadbalancerCluster }}
-          os_disk {
-            name                 = "{{ $node.Name }}-osdisk"
-            caching              = "ReadWrite"
-            storage_account_type = "StandardSSD_LRS"
-            disk_size_gb         = "50"
-          }
-        {{- end }}
+  computer_name  = "{{ $node.Name }}"
+  admin_username = "claudie"
 
-        {{- if $isKubernetesCluster }}
-          os_disk {
-            name                 = "{{ $node.Name }}-osdisk"
-            caching              = "ReadWrite"
-            storage_account_type = "StandardSSD_LRS"
-            disk_size_gb         = "100"
-          }
-        {{- end }}
-        }
+  tags = {
+    managed-by      = "Claudie"
+    claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
+  }
 
-        {{- $virtualMachineExtensionResourceName   := printf "%s_%s_postcreation_script" $node.Name $resourceSuffix }}
-        {{- $virtualMachineExtensionName           := printf "vm-ext-%s" $node.Name }}
+  {{- if $isLoadbalancerCluster }}
+  os_disk {
+    name                 = "{{ $node.Name }}-osdisk"
+    caching              = "ReadWrite"
+    storage_account_type = "StandardSSD_LRS"
+    disk_size_gb         = "50"
+  }
+  {{- end }}
 
-        resource "azurerm_virtual_machine_extension" "{{ $virtualMachineExtensionResourceName }}" {
-          provider             = azurerm.nodepool_{{ $resourceSuffix }}
-          name                 = "{{ $virtualMachineExtensionName }}"
-          virtual_machine_id   = azurerm_linux_virtual_machine.{{ $virtualMachineResourceName }}.id
-          publisher            = "Microsoft.Azure.Extensions"
-          type                 = "CustomScript"
-          type_handler_version = "2.0"
+  {{- if $isKubernetesCluster }}
+  os_disk {
+    name                 = "{{ $node.Name }}-osdisk"
+    caching              = "ReadWrite"
+    storage_account_type = "StandardSSD_LRS"
+    disk_size_gb         = "100"
+  }
+  {{- end }}
+}
 
-          tags = {
-            managed-by      = "Claudie"
-            claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
-          }
+{{- $virtualMachineExtensionResourceName := printf "%s_%s_postcreation_script" $node.Name $resourceSuffix }}
+{{- $virtualMachineExtensionName         := printf "vm-ext-%s" $node.Name }}
 
-        {{- if $isLoadbalancerCluster }}
-          protected_settings = <<PROT
-          {
-                "script": "${base64encode(<<EOF
+resource "azurerm_virtual_machine_extension" "{{ $virtualMachineExtensionResourceName }}" {
+  provider             = azurerm.nodepool_{{ $resourceSuffix }}
+  name                 = "{{ $virtualMachineExtensionName }}"
+  virtual_machine_id   = azurerm_linux_virtual_machine.{{ $virtualMachineResourceName }}.id
+  publisher            = "Microsoft.Azure.Extensions"
+  type                 = "CustomScript"
+  type_handler_version = "2.0"
+
+  tags = {
+    managed-by      = "Claudie"
+    claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
+  }
+
+  {{- if $isLoadbalancerCluster }}
+  protected_settings = <<PROT
+  {
+    "script": "${base64encode(<<EOF
 #!/bin/bash
 # Allow ssh as root
 sudo sed -n 's/^.*ssh-rsa/ssh-rsa/p' /root/.ssh/authorized_keys > /root/.ssh/temp
 sudo cat /root/.ssh/temp > /root/.ssh/authorized_keys
 sudo rm /root/.ssh/temp
-sudo echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> sshd_config
+sudo echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> /etc/ssh/sshd_config
 # Configure SSH port
-echo "Port ${local.claudie_ssh_port_{{ $resourceSuffix }}}" >> /etc/ssh/sshd_config
+echo "Port {{ $claudieSshPort }}" >> /etc/ssh/sshd_config
 mkdir -p /etc/systemd/system/ssh.socket.d
 cat <<SSHEOF > /etc/systemd/system/ssh.socket.d/override.conf
 [Socket]
 ListenStream=
-ListenStream=0.0.0.0:${local.claudie_ssh_port_{{ $resourceSuffix }}}
+ListenStream=0.0.0.0:{{ $claudieSshPort }}
 SSHEOF
 systemctl daemon-reload
 systemctl restart ssh.socket
@@ -126,15 +142,14 @@ else
 fi
 EOF
 )}"
-        }
+  }
 PROT
-        {{- end }}
+  {{- end }}{{/* if $isLoadbalancerCluster */}}
 
-        {{- if $isKubernetesCluster }}
-
-          protected_settings = <<PROT
-          {
-          "script": "${base64encode(<<EOF
+  {{- if $isKubernetesCluster }}
+  protected_settings = <<PROT
+  {
+    "script": "${base64encode(<<EOF
 #!/bin/bash
 set -euxo pipefail
 
@@ -142,14 +157,14 @@ set -euxo pipefail
 sudo sed -n 's/^.*ssh-rsa/ssh-rsa/p' /root/.ssh/authorized_keys > /root/.ssh/temp
 sudo cat /root/.ssh/temp > /root/.ssh/authorized_keys
 sudo rm /root/.ssh/temp
-sudo echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> sshd_config
+sudo echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> /etc/ssh/sshd_config
 # Configure SSH port
-echo "Port ${local.claudie_ssh_port_{{ $resourceSuffix }}}" >> /etc/ssh/sshd_config
+echo "Port {{ $claudieSshPort }}" >> /etc/ssh/sshd_config
 mkdir -p /etc/systemd/system/ssh.socket.d
 cat <<SSHEOF > /etc/systemd/system/ssh.socket.d/override.conf
 [Socket]
 ListenStream=
-ListenStream=0.0.0.0:${local.claudie_ssh_port_{{ $resourceSuffix }}}
+ListenStream=0.0.0.0:{{ $claudieSshPort }}
 SSHEOF
 systemctl daemon-reload
 systemctl restart ssh.socket
@@ -164,7 +179,7 @@ fi
 # Create longhorn volume directory
 mkdir -p /opt/claudie/data
 
-            {{- if $isWorkerNodeWithDiskAttached }}
+{{- if $isWorkerNodeWithDiskAttached }}
 
 # Mount managed disk only when not mounted yet
 sleep 50
@@ -178,60 +193,58 @@ if ! grep -qs "/dev/$disk" /proc/mounts; then
   echo "/dev/$disk /opt/claudie/data xfs defaults 0 0" >> /etc/fstab
 fi
 
-            {{- end }}
+{{- end }}{{/* if $isWorkerNodeWithDiskAttached */}}
 
 EOF
-        )}"
-          }
+)}"
+  }
 PROT
+  {{- end }}{{/* if $isKubernetesCluster */}}
+}
 
-        {{- end }}
-        }
+{{- if $isKubernetesCluster }}
+{{-   if $isWorkerNodeWithDiskAttached }}
 
-        {{- if $isKubernetesCluster }}
-            {{- if $isWorkerNodeWithDiskAttached }}
-        resource "azurerm_managed_disk" "{{ $vmDiskResourceName }}" {
-          provider             = azurerm.nodepool_{{ $resourceSuffix }}
-          name                 = "{{ $vmDiskName }}"
-          location             = "{{ $nodepool.Details.Region }}"
-        {{- if $nodepool.Details.Zone }}
-          zone                 = {{ $nodepool.Details.Zone }}
-        {{- else }}
-          # Zone is only set if the region supports availability zones
-          zone                 = length(local.azure_zones_{{ $resourceSuffix }}) > 0 ? element(local.azure_zones_{{ $resourceSuffix }}, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16)) : null
-        {{- end }}
-          resource_group_name  = azurerm_resource_group.{{ $resourceGroupResourceName }}.name
-          storage_account_type = "StandardSSD_LRS"
-          create_option        = "Empty"
-          disk_size_gb         = {{ $nodepool.Details.StorageDiskSize }}
+resource "azurerm_managed_disk" "{{ $vmDiskResourceName }}" {
+  provider             = azurerm.nodepool_{{ $resourceSuffix }}
+  name                 = "{{ $vmDiskName }}"
+  location             = "{{ $nodepool.Details.Region }}"
+  {{- if $nodepool.Details.Zone }}
+  zone                 = {{ $nodepool.Details.Zone }}
+  {{- else }}
+  # Zone is only set if the region supports availability zones
+  zone                 = length(local.azure_zones_{{ $resourceSuffix }}) > 0 ? element(local.azure_zones_{{ $resourceSuffix }}, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16)) : null
+  {{- end }}
+  resource_group_name  = "{{ $rgName }}"
+  storage_account_type = "StandardSSD_LRS"
+  create_option        = "Empty"
+  disk_size_gb         = {{ $nodepool.Details.StorageDiskSize }}
 
-          tags = {
-            managed-by      = "Claudie"
-            claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
-          }
-        }
+  tags = {
+    managed-by      = "Claudie"
+    claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
+  }
+}
 
+resource "azurerm_virtual_machine_data_disk_attachment" "{{ $vmDiskAttachmentResourceName }}" {
+  provider           = azurerm.nodepool_{{ $resourceSuffix }}
+  managed_disk_id    = azurerm_managed_disk.{{ $vmDiskResourceName }}.id
+  virtual_machine_id = azurerm_linux_virtual_machine.{{ $virtualMachineResourceName }}.id
+  lun                = "37"
+  caching            = "ReadWrite"
+}
 
+{{-   end }}{{/* if $isWorkerNodeWithDiskAttached */}}
+{{- end }}{{/* if $isKubernetesCluster */}}
 
-        resource "azurerm_virtual_machine_data_disk_attachment" "{{ $vmDiskAttachmentResourceName }}" {
-          provider           = azurerm.nodepool_{{ $resourceSuffix }}
-          managed_disk_id    = azurerm_managed_disk.{{ $vmDiskResourceName }}.id
-          virtual_machine_id = azurerm_linux_virtual_machine.{{ $virtualMachineResourceName }}.id
-          lun                = "37"
-          caching            = "ReadWrite"
-        }
-            {{- end }}
-        {{- end }}
+{{- end }}{{/* range $nodepool.Nodes */}}
 
-    {{- end }}
-
-output "{{ $nodepool.Name }}_{{ $nodepoolSpecName }}_{{ $uniqueFingerPrint }}" {
+output "{{ $nodepool.Name }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
   value = {
     {{- range $node := $nodepool.Nodes }}
-        {{- $virtualMachineResourceName   := printf "%s_%s" $node.Name $resourceSuffix }}
-        {{- $publicIPResourceName         := printf "%s_%s_public_ip" $node.Name $resourceSuffix }}
-        "${azurerm_linux_virtual_machine.{{ $virtualMachineResourceName }}.name}" = [azurerm_public_ip.{{ $publicIPResourceName }}.ip_address, tostring(local.claudie_ssh_port_{{ $resourceSuffix }})]
+    {{- $virtualMachineResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
+    {{- $publicIPResourceName       := printf "%s_%s_public_ip" $node.Name $resourceSuffix }}
+    "${azurerm_linux_virtual_machine.{{ $virtualMachineResourceName }}.name}" = [azurerm_public_ip.{{ $publicIPResourceName }}.ip_address, "{{ $claudieSshPort }}"]
     {{- end }}
   }
 }
-{{- end }}
