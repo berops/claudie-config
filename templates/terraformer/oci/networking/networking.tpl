@@ -108,10 +108,19 @@ resource "oci_core_default_security_list" "{{ $coreSecurityListResourceName }}" 
   ingress_security_rules {
     protocol  = lookup(local.protocol_to_number_{{ $specName }}_{{ $uniqueFingerPrint }}, lower("{{ $role.Protocol }}"), -1)
     source    = "0.0.0.0/0"
+    {{- /* OCI rejects tcp_options on non-TCP rules, so pick the options block
+           matching the role protocol. */}}
+    {{- if eq (lower $role.Protocol) "udp" }}
+    udp_options {
+      max = "{{ $role.Port }}"
+      min = "{{ $role.Port }}"
+    }
+    {{- else }}
     tcp_options {
       max = "{{ $role.Port }}"
       min = "{{ $role.Port }}"
     }
+    {{- end }}
     description = "LoadBalancer port defined in the manifest"
   }
   {{-   end }}{{/* range $LoadBalancerRoles */}}
