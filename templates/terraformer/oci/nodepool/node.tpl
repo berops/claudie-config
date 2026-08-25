@@ -5,82 +5,110 @@
 {{- $isLoadbalancerCluster := eq .Data.ClusterData.ClusterType "LB" }}
 
 
-{{- range $i, $nodepool := .Data.NodePools }}
-
+{{- $nodepool       := .Data.NodePool }}
 {{- $region         := $nodepool.Details.Region }}
 {{- $specName       := $nodepool.Details.Provider.SpecName }}
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
+{{- $networking     := .Data.Networking.All }}
+{{- $claudieSshPort := index $networking (printf "claudie_ssh_port_%s_%s" $specName $uniqueFingerPrint) }}
 
-    {{- range $_, $node := $nodepool.Nodes }}
+{{- if not $claudieSshPort }}{{ template "node.tpl: missing output 'claudie_ssh_port_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
 
-        {{- $coreInstanceResourceName     := printf "%s_%s" $node.Name $resourceSuffix }}
-        {{- $coreSubnetResourceName       := printf "%s_%s_subnet" $nodepool.Name $resourceSuffix }}
-        {{- $varCompartmentID             := printf "default_compartment_id_%s" $resourceSuffix }}
-        {{- $isWorkerNodeWithDiskAttached := and (not $nodepool.IsControl) (gt $nodepool.Details.StorageDiskSize 0) }}
-        {{- $varStorageDiskName           := printf "oci_storage_disk_name_%s" $resourceSuffix }}
+# Fetch available availability domains for the region
+# Note: Availability domains must be queried using the tenancy OCID (root compartment),
+# not a sub-compartment OCID, as ADs are tenancy-level resources.
+data "oci_identity_availability_domains" "available_{{ $resourceSuffix }}" {
+  provider       = oci.nodepool_{{ $resourceSuffix }}
+  compartment_id = "{{ $nodepool.Details.Provider.GetOci.TenancyOCID }}"
+}
 
-        resource "oci_core_instance" "{{ $coreInstanceResourceName }}" {
-          provider            = oci.nodepool_{{ $resourceSuffix }}
-          compartment_id      = var.{{ $varCompartmentID }}
-        {{- if $nodepool.Details.Zone }}
-          availability_domain = "{{ $nodepool.Details.Zone }}"
-        {{- else }}
-          availability_domain = element(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16)).name
-        {{- end }}
-          shape               = "{{ $nodepool.Details.ServerType }}"
-          display_name        = "{{ $node.Name }}"
+{{- $varCompartmentID := printf "default_compartment_id_%s" $resourceSuffix }}
 
-        {{if $nodepool.Details.MachineSpec}}
-           shape_config {
-               memory_in_gbs = {{ $nodepool.Details.MachineSpec.Memory }}
-               ocpus = {{ $nodepool.Details.MachineSpec.CpuCount }}
-           }
-        {{end}}
+variable "{{ $varCompartmentID }}" {
+  type    = string
+  default = "{{ $nodepool.Details.Provider.GetOci.CompartmentOCID }}"
+}
 
-        {{- if $nodepool.Details.Spot }}
-          preemptible_instance_config {
-            preemption_action {
-              type                 = "TERMINATE"
-              preserve_boot_volume = false
-            }
-          }
-        {{- end }}
+{{- if $isKubernetesCluster }}
 
-          create_vnic_details {
-            assign_public_ip  = true
-            subnet_id         = oci_core_subnet.{{ $coreSubnetResourceName }}.id
-          }
+{{- $varStorageDiskName := printf "oci_storage_disk_name_%s" $resourceSuffix }}
 
-          freeform_tags = {
-            "Managed-by"      = "Claudie"
-            "Claudie-cluster" = "{{ $clusterName }}-{{ $clusterHash }}"
-          }
+variable "{{ $varStorageDiskName }}" {
+  default = "oraclevdb"
+  type    = string
+}
+{{- end }}{{/* if $isKubernetesCluster */}}
 
-        {{- if $isLoadbalancerCluster }}
-          source_details {
-            source_id               = "{{ $nodepool.Details.Image }}"
-            source_type             = "image"
-            boot_volume_size_in_gbs = "50"
-          }
+{{- range $_, $node := $nodepool.Nodes }}
 
-          metadata = {
-              ssh_authorized_keys = file("./{{ $nodepool.Name }}")
-              user_data = base64encode(<<EOF
+{{- $coreInstanceResourceName     := printf "%s_%s" $node.Name $resourceSuffix }}
+{{- $coreSubnetResourceName       := printf "%s_%s_subnet" $nodepool.Name $resourceSuffix }}
+{{- $varCompartmentID             := printf "default_compartment_id_%s" $resourceSuffix }}
+{{- $isWorkerNodeWithDiskAttached := and (not $nodepool.IsControl) (gt $nodepool.Details.StorageDiskSize 0) }}
+{{- $varStorageDiskName           := printf "oci_storage_disk_name_%s" $resourceSuffix }}
+
+resource "oci_core_instance" "{{ $coreInstanceResourceName }}" {
+  provider            = oci.nodepool_{{ $resourceSuffix }}
+  compartment_id      = var.{{ $varCompartmentID }}
+  {{- if $nodepool.Details.Zone }}
+  availability_domain = "{{ $nodepool.Details.Zone }}"
+  {{- else }}
+  availability_domain = element(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16)).name
+  {{- end }}
+  shape               = "{{ $nodepool.Details.ServerType }}"
+  display_name        = "{{ $node.Name }}"
+
+  {{- if $nodepool.Details.MachineSpec }}
+  shape_config {
+    memory_in_gbs = {{ $nodepool.Details.MachineSpec.Memory }}
+    ocpus         = {{ $nodepool.Details.MachineSpec.CpuCount }}
+  }
+  {{- end }}
+
+  {{- if $nodepool.Details.Spot }}
+  preemptible_instance_config {
+    preemption_action {
+      type                 = "TERMINATE"
+      preserve_boot_volume = false
+    }
+  }
+  {{- end }}
+
+  create_vnic_details {
+    assign_public_ip  = true
+    subnet_id         = oci_core_subnet.{{ $coreSubnetResourceName }}.id
+  }
+
+  freeform_tags = {
+    "Managed-by"      = "Claudie"
+    "Claudie-cluster" = "{{ $clusterName }}-{{ $clusterHash }}"
+  }
+
+  {{- if $isLoadbalancerCluster }}
+  source_details {
+    source_id               = "{{ $nodepool.Details.Image }}"
+    source_type             = "image"
+    boot_volume_size_in_gbs = "50"
+  }
+
+  metadata = {
+    ssh_authorized_keys = file("./{{ $nodepool.Name }}")
+    user_data = base64encode(<<EOF
               #cloud-config
               runcmd:
                 # Allow Claudie to ssh as root
                 - sed -n 's/^.*ssh-rsa/ssh-rsa/p' /root/.ssh/authorized_keys > /root/.ssh/temp
                 - cat /root/.ssh/temp > /root/.ssh/authorized_keys
                 - rm /root/.ssh/temp
-                - echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> sshd_config
+                - echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> /etc/ssh/sshd_config
                 # Configure SSH port
-                - echo "Port ${local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}}" >> /etc/ssh/sshd_config
+                - echo "Port {{ $claudieSshPort }}" >> /etc/ssh/sshd_config
                 - mkdir -p /etc/systemd/system/ssh.socket.d
                 - |
                   cat <<SSHEOF > /etc/systemd/system/ssh.socket.d/override.conf
                   [Socket]
                   ListenStream=
-                  ListenStream=0.0.0.0:${local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}}
+                  ListenStream=0.0.0.0:{{ $claudieSshPort }}
                   SSHEOF
                 - systemctl daemon-reload
                 - systemctl restart ssh.socket
@@ -107,35 +135,35 @@
                       systemctl restart ssh
                   fi
               EOF
-              )
-          }
-        {{- end }}
+    )
+  }
+  {{- end }}{{/* if $isLoadbalancerCluster */}}
 
-        {{- if $isKubernetesCluster }}
-          source_details {
-            source_id               = "{{ $nodepool.Details.Image }}"
-            source_type             = "image"
-            boot_volume_size_in_gbs = "100"
-          }
+  {{- if $isKubernetesCluster }}
+  source_details {
+    source_id               = "{{ $nodepool.Details.Image }}"
+    source_type             = "image"
+    boot_volume_size_in_gbs = "100"
+  }
 
-          metadata = {
-              ssh_authorized_keys = file("./{{ $nodepool.Name }}")
-              user_data = base64encode(<<EOF
+  metadata = {
+    ssh_authorized_keys = file("./{{ $nodepool.Name }}")
+    user_data = base64encode(<<EOF
               #cloud-config
               runcmd:
                 # Allow Claudie to ssh as root
                 - sed -n 's/^.*ssh-rsa/ssh-rsa/p' /root/.ssh/authorized_keys > /root/.ssh/temp
                 - cat /root/.ssh/temp > /root/.ssh/authorized_keys
                 - rm /root/.ssh/temp
-                - echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> sshd_config
+                - echo 'PermitRootLogin without-password' >> /etc/ssh/sshd_config && echo 'PubkeyAuthentication yes' >> /etc/ssh/sshd_config && echo "PubkeyAcceptedKeyTypes=+ssh-rsa" >> /etc/ssh/sshd_config
                 # Configure SSH port
-                - echo "Port ${local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}}" >> /etc/ssh/sshd_config
+                - echo "Port {{ $claudieSshPort }}" >> /etc/ssh/sshd_config
                 - mkdir -p /etc/systemd/system/ssh.socket.d
                 - |
                   cat <<SSHEOF > /etc/systemd/system/ssh.socket.d/override.conf
                   [Socket]
                   ListenStream=
-                  ListenStream=0.0.0.0:${local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}}
+                  ListenStream=0.0.0.0:{{ $claudieSshPort }}
                   SSHEOF
                 - systemctl daemon-reload
                 - systemctl restart ssh.socket
@@ -177,60 +205,58 @@
                     mount /dev/$disk /opt/claudie/data
                     echo "/dev/$disk /opt/claudie/data xfs defaults 0 0" >> /etc/fstab
                   fi
-                {{- end }}
+                {{- end }}{{/* if $isWorkerNodeWithDiskAttached */}}
               EOF
-              )
-          }
-        {{- end }}
-        }
+    )
+  }
+  {{- end }}{{/* if $isKubernetesCluster */}}
+}
 
-        {{- if $isKubernetesCluster }}
-            {{- if $isWorkerNodeWithDiskAttached }}
+{{- if $isKubernetesCluster }}
+{{-   if $isWorkerNodeWithDiskAttached }}
 
+{{- $coreVolumeResourceName       := printf "%s_%s_volume" $node.Name $resourceSuffix }}
+{{- $coreVolumeName               := printf "%sd" $node.Name }}
+{{- $coreAttachedDiskResourceName := printf "%s_%s_volume_att" $node.Name $resourceSuffix }}
+{{- $coreAttachedDiskName         := printf "att-%s" $node.Name }}
 
-            {{- $coreVolumeResourceName          := printf "%s_%s_volume" $node.Name $resourceSuffix }}
-            {{- $coreVolumeName                  := printf "%sd" $node.Name }}
-            {{- $coreAttachedDiskResourceName    := printf "%s_%s_volume_att" $node.Name $resourceSuffix }}
-            {{- $coreAttachedDiskName            := printf "att-%s" $node.Name }}
+resource "oci_core_volume" "{{ $coreVolumeResourceName }}" {
+  provider            = oci.nodepool_{{ $resourceSuffix }}
+  compartment_id      = var.{{ $varCompartmentID }}
+  {{- if $nodepool.Details.Zone }}
+  availability_domain = "{{ $nodepool.Details.Zone }}"
+  {{- else }}
+  availability_domain = element(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16)).name
+  {{- end }}
+  size_in_gbs         = "{{ $nodepool.Details.StorageDiskSize }}"
+  display_name        = "{{ $coreVolumeName }}"
+  vpus_per_gb         = 10
 
-            resource "oci_core_volume" "{{ $coreVolumeResourceName }}" {
-              provider            = oci.nodepool_{{ $resourceSuffix }}
-              compartment_id      = var.{{ $varCompartmentID }}
-            {{- if $nodepool.Details.Zone }}
-              availability_domain = "{{ $nodepool.Details.Zone }}"
-            {{- else }}
-              availability_domain = element(data.oci_identity_availability_domains.available_{{ $resourceSuffix }}.availability_domains, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16)).name
-            {{- end }}
-              size_in_gbs         = "{{ $nodepool.Details.StorageDiskSize }}"
-              display_name        = "{{ $coreVolumeName }}"
-              vpus_per_gb         = 10
+  freeform_tags = {
+    "Managed-by"      = "Claudie"
+    "Claudie-cluster" = "{{ $clusterName }}-{{ $clusterHash }}"
+  }
+}
 
-              freeform_tags = {
-                "Managed-by"      = "Claudie"
-                "Claudie-cluster" = "{{ $clusterName }}-{{ $clusterHash }}"
-              }
-            }
+resource "oci_core_volume_attachment" "{{ $coreAttachedDiskResourceName }}" {
+  provider        = oci.nodepool_{{ $resourceSuffix }}
+  attachment_type = "paravirtualized"
+  instance_id     = oci_core_instance.{{ $coreInstanceResourceName }}.id
+  volume_id       = oci_core_volume.{{ $coreVolumeResourceName }}.id
+  display_name    = "{{ $coreAttachedDiskName }}"
+  device          = "/dev/oracleoci/${var.{{ $varStorageDiskName }}}"
+}
 
-            resource "oci_core_volume_attachment" "{{ $coreAttachedDiskResourceName }}" {
-              provider        = oci.nodepool_{{ $resourceSuffix }}
-              attachment_type = "paravirtualized"
-              instance_id     = oci_core_instance.{{ $coreInstanceResourceName }}.id
-              volume_id       = oci_core_volume.{{ $coreVolumeResourceName }}.id
-              display_name    = "{{ $coreAttachedDiskName }}"
-              device          = "/dev/oracleoci/${var.{{ $varStorageDiskName }}}"
-            }
+{{-   end }}{{/* if $isWorkerNodeWithDiskAttached */}}
+{{- end }}{{/* if $isKubernetesCluster */}}
 
-            {{- end }}
-        {{- end }}
-
-{{- end }}
+{{- end }}{{/* range $nodepool.Nodes */}}
 
 output "{{ $nodepool.Name }}_{{ $specName }}_{{ $uniqueFingerPrint }}" {
   value = {
-  {{- range $node := $nodepool.Nodes }}
-        {{- $coreInstanceResourceName     := printf "%s_%s" $node.Name $resourceSuffix }}
-        "${oci_core_instance.{{ $coreInstanceResourceName }}.display_name}" = [oci_core_instance.{{ $coreInstanceResourceName }}.public_ip, tostring(local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }})]
-  {{- end }}
+    {{- range $node := $nodepool.Nodes }}
+    {{- $coreInstanceResourceName := printf "%s_%s" $node.Name $resourceSuffix }}
+    "${oci_core_instance.{{ $coreInstanceResourceName }}.display_name}" = [oci_core_instance.{{ $coreInstanceResourceName }}.public_ip, "{{ $claudieSshPort }}"]
+    {{- end }}
   }
 }
-{{- end }}

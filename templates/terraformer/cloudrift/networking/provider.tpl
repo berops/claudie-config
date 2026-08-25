@@ -4,8 +4,8 @@
 
 provider "cloudrift" {
   token = file("{{ $specName }}")
-  alias = "nodepool_{{ $resourceSuffix }}"
-{{- if .Data.Provider.GetCloudrift.TeamId }}
+  alias = "networking_{{ $resourceSuffix }}"
+  {{- if .Data.Provider.GetCloudrift.TeamId }}
   team_id = "{{ .Data.Provider.GetCloudrift.TeamId }}"
-{{- end }}
+  {{- end }}
 }

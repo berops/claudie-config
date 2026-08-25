@@ -1,5 +1,6 @@
+{{- $nodepool          := .Data.NodePool }}
+{{- $specName          := $nodepool.Details.Provider.SpecName }}
 {{- $uniqueFingerPrint := .Fingerprint }}
-{{- $specName          := (index .Data.NodePools 0).Details.Provider.SpecName }}
 
 locals {
   # Accelerated networking can be enabled based on conditions

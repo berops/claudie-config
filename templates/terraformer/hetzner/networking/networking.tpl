@@ -16,7 +16,7 @@ locals {
 {{- $firewallName  := printf "fwl%s%s" $clusterHash $uniqueFingerPrint }}
 
 resource "hcloud_firewall" "{{ $firewallResourceName }}" {
-  provider = hcloud.nodepool_{{ $resourceSuffix }}
+  provider = hcloud.networking_{{ $resourceSuffix }}
   name     = "{{ $firewallName }}"
   rule {
     direction  = "in"
@@ -79,4 +79,12 @@ resource "hcloud_firewall" "{{ $firewallResourceName }}" {
     "managed-by"      : "Claudie"
     "claudie-cluster" : "{{ $clusterName }}-{{ $clusterHash }}"
   }
+}
+
+output "{{ $firewallResourceName }}" {
+  value = hcloud_firewall.{{ $firewallResourceName }}.id
+}
+
+output "claudie_ssh_port_{{ $resourceSuffix }}" {
+  value = tostring(local.claudie_ssh_port_{{ $resourceSuffix }})
 }

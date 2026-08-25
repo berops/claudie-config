@@ -21,23 +21,8 @@ locals {
 
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
 
-# Fetch available availability domains for the region
-# Note: Availability domains must be queried using the tenancy OCID (root compartment),
-# not a sub-compartment OCID, as ADs are tenancy-level resources.
-data "oci_identity_availability_domains" "available_{{ $resourceSuffix }}" {
-  provider       = oci.nodepool_{{ $resourceSuffix }}
-  compartment_id = "{{ $.Data.Provider.GetOci.TenancyOCID }}"
-}
+{{- $varCompartmentID := printf "default_compartment_id_%s" $resourceSuffix }}
 
-{{- if $isKubernetesCluster }}
-    {{- $varStorageDiskName  := printf "oci_storage_disk_name_%s" $resourceSuffix }}
-    variable "{{ $varStorageDiskName }}" {
-      default = "oraclevdb"
-      type    = string
-    }
-{{- end }}
-
-{{- $varCompartmentID  := printf "default_compartment_id_%s" $resourceSuffix }}
 variable "{{ $varCompartmentID }}" {
   type    = string
   default = "{{ $.Data.Provider.GetOci.CompartmentOCID }}"
@@ -47,7 +32,7 @@ variable "{{ $varCompartmentID }}" {
 {{- $coreVCNName          := printf "vcn%s%s-%s"       $clusterHash $uniqueFingerPrint $region }}
 
 resource "oci_core_vcn" "{{ $coreVCNResourceName }}" {
-  provider        = oci.nodepool_{{ $resourceSuffix }}
+  provider        = oci.networking_{{ $resourceSuffix }}
   compartment_id  = var.{{ $varCompartmentID }}
   display_name    = "{{ $coreVCNName }}"
   cidr_blocks     = ["10.0.0.0/16"]
@@ -62,7 +47,7 @@ resource "oci_core_vcn" "{{ $coreVCNResourceName }}" {
 {{- $coreGatewayName          := printf "gtw%s%s-%s"           $clusterHash $uniqueFingerPrint $region }}
 
 resource "oci_core_internet_gateway" "{{ $coreGatewayResourceName }}" {
-  provider        = oci.nodepool_{{ $resourceSuffix }}
+  provider        = oci.networking_{{ $resourceSuffix }}
   compartment_id  = var.{{ $varCompartmentID }}
   display_name    = "{{ $coreGatewayName }}"
   vcn_id          = oci_core_vcn.{{ $coreVCNResourceName }}.id
@@ -78,7 +63,7 @@ resource "oci_core_internet_gateway" "{{ $coreGatewayResourceName }}" {
 {{- $coreSecurityListName          := printf "sl%s%s-%s"                   $clusterHash $uniqueFingerPrint $region }}
 
 resource "oci_core_default_security_list" "{{ $coreSecurityListResourceName }}" {
-  provider                    = oci.nodepool_{{ $resourceSuffix }}
+  provider                    = oci.networking_{{ $resourceSuffix }}
   manage_default_resource_id  = oci_core_vcn.{{ $coreVCNResourceName }}.default_security_list_id
   display_name                = "{{ $coreSecurityListName }}"
 
@@ -104,8 +89,8 @@ resource "oci_core_default_security_list" "{{ $coreSecurityListResourceName }}" 
     description = "Allow SSH connections"
   }
 
-{{- if $isKubernetesCluster }}
-  {{- if $K8sHasAPIServer }}
+  {{- if $isKubernetesCluster }}
+  {{-   if $K8sHasAPIServer }}
   ingress_security_rules {
     protocol    = "6"
     source      = "0.0.0.0/0"
@@ -115,22 +100,31 @@ resource "oci_core_default_security_list" "{{ $coreSecurityListResourceName }}" 
     }
     description = "Allow kube API port"
   }
-  {{- end }}
-{{- end }}
+  {{-   end }}{{/* if $K8sHasAPIServer */}}
+  {{- end }}{{/* if $isKubernetesCluster */}}
 
-{{- if $isLoadbalancerCluster }}
-  {{- range $role := $LoadBalancerRoles }}
+  {{- if $isLoadbalancerCluster }}
+  {{-   range $role := $LoadBalancerRoles }}
   ingress_security_rules {
     protocol  = lookup(local.protocol_to_number_{{ $specName }}_{{ $uniqueFingerPrint }}, lower("{{ $role.Protocol }}"), -1)
     source    = "0.0.0.0/0"
+    {{- /* OCI rejects tcp_options on non-TCP rules, so pick the options block
+           matching the role protocol. */}}
+    {{- if eq (lower $role.Protocol) "udp" }}
+    udp_options {
+      max = "{{ $role.Port }}"
+      min = "{{ $role.Port }}"
+    }
+    {{- else }}
     tcp_options {
       max = "{{ $role.Port }}"
       min = "{{ $role.Port }}"
     }
+    {{- end }}
     description = "LoadBalancer port defined in the manifest"
   }
-  {{- end }}
-{{- end }}
+  {{-   end }}{{/* range $LoadBalancerRoles */}}
+  {{- end }}{{/* if $isLoadbalancerCluster */}}
 
   ingress_security_rules {
     protocol    = "17"
@@ -148,10 +142,10 @@ resource "oci_core_default_security_list" "{{ $coreSecurityListResourceName }}" 
   }
 }
 
-{{- $coreRouteTableResourceName  := printf "claudie_routes_%s"   $resourceSuffix }}
+{{- $coreRouteTableResourceName := printf "claudie_routes_%s" $resourceSuffix }}
 
 resource "oci_core_default_route_table" "{{ $coreRouteTableResourceName }}" {
-  provider                    = oci.nodepool_{{ $resourceSuffix }}
+  provider                    = oci.networking_{{ $resourceSuffix }}
   manage_default_resource_id  = oci_core_vcn.{{ $coreVCNResourceName }}.default_route_table_id
 
   route_rules {
@@ -165,5 +159,25 @@ resource "oci_core_default_route_table" "{{ $coreRouteTableResourceName }}" {
     "Claudie-cluster" = "{{ $clusterName }}-{{ $clusterHash }}"
   }
 }
-{{- end }}
 
+output "{{ $coreVCNResourceName }}" {
+  value = oci_core_vcn.{{ $coreVCNResourceName }}.id
+}
+
+output "claudie_security_list_{{ $resourceSuffix }}" {
+  value = oci_core_vcn.{{ $coreVCNResourceName }}.default_security_list_id
+}
+
+output "claudie_route_table_{{ $resourceSuffix }}" {
+  value = oci_core_vcn.{{ $coreVCNResourceName }}.default_route_table_id
+}
+
+output "claudie_dhcp_options_{{ $resourceSuffix }}" {
+  value = oci_core_vcn.{{ $coreVCNResourceName }}.default_dhcp_options_id
+}
+
+{{- end }}{{/* range .Data.Regions */}}
+
+output "claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}" {
+  value = tostring(local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }})
+}

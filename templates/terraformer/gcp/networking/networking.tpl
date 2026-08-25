@@ -7,34 +7,19 @@
 {{- $LoadBalancerRoles     := .Data.LBData.Roles }}
 {{- $K8sHasAPIServer       := .Data.K8sData.HasAPIServer }}
 
-{{- range $_, $region := .Data.Regions}}
+locals {
+  claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }} = 22522
+}
+
+{{- range $_, $region := .Data.Regions }}
 
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
-
-locals {
-  claudie_ssh_port_{{ $resourceSuffix }} = 22522
-}
-
-# Fetch available zones for this region
-data "google_compute_zones" "available_{{ $resourceSuffix }}" {
-  provider = google.nodepool_{{ $resourceSuffix }}
-  region   = "{{ $region }}"
-  status   = "UP"
-}
-
-{{- if $isKubernetesCluster }}
-    {{- $varStorageDiskName  := printf "gcp_storage_disk_name_%s" $resourceSuffix }}
-    variable "{{ $varStorageDiskName}}" {
-      default = "storage-disk"
-      type    = string
-    }
-{{- end }}
 
 {{- $computeNetworkResourceName  := printf "network_%s"   $resourceSuffix }}
 {{- $computeNetworkName          := printf "net%s%s-%s"   $clusterHash $uniqueFingerPrint $region }}
 
 resource "google_compute_network" "{{ $computeNetworkResourceName }}" {
-  provider                = google.nodepool_{{ $resourceSuffix }}
+  provider                = google.networking_{{ $resourceSuffix }}
   name                    = "{{ $computeNetworkName }}"
   auto_create_subnetworks = false
   description             = "Managed by Claudie for cluster {{ $clusterName }}-{{ $clusterHash }}"
@@ -43,30 +28,29 @@ resource "google_compute_network" "{{ $computeNetworkResourceName }}" {
 {{- $computeFirewallResourceName     := printf "firewall_%s"  $resourceSuffix }}
 {{- $computeFirewallName             := printf "fwl%s%s-%s"   $clusterHash $uniqueFingerPrint $region }}
 
-
 resource "google_compute_firewall" "{{ $computeFirewallResourceName }}" {
-  provider     = google.nodepool_{{ $resourceSuffix }}
+  provider     = google.networking_{{ $resourceSuffix }}
   name         = "{{ $computeFirewallName }}"
   network      = google_compute_network.{{ $computeNetworkResourceName }}.self_link
   description  = "Managed by Claudie for cluster {{ $clusterName }}-{{ $clusterHash }}"
 
-{{- if $isLoadbalancerCluster }}
-    {{- range $role :=  $LoadBalancerRoles }}
-    allow {
-        protocol = "{{ $role.Protocol }}"
-        ports = ["{{ $role.Port }}"]
-    }
-  {{- end }}
-{{- end }}
-
-{{- if $isKubernetesCluster }}
-  {{- if $K8sHasAPIServer }}
+  {{- if $isLoadbalancerCluster }}
+  {{-   range $role := $LoadBalancerRoles }}
   allow {
-      protocol = "TCP"
-      ports    = ["6443"]
+    protocol = "{{ $role.Protocol }}"
+    ports    = ["{{ $role.Port }}"]
   }
-  {{- end }}
-{{- end }}
+  {{-   end }}{{/* range $LoadBalancerRoles */}}
+  {{- end }}{{/* if $isLoadbalancerCluster */}}
+
+  {{- if $isKubernetesCluster }}
+  {{-   if $K8sHasAPIServer }}
+  allow {
+    protocol = "TCP"
+    ports    = ["6443"]
+  }
+  {{-   end }}{{/* if $K8sHasAPIServer */}}
+  {{- end }}{{/* if $isKubernetesCluster */}}
 
   allow {
     protocol = "UDP"
@@ -74,17 +58,25 @@ resource "google_compute_firewall" "{{ $computeFirewallResourceName }}" {
   }
 
   allow {
-      protocol = "TCP"
-      ports    = [tostring(local.claudie_ssh_port_{{ $resourceSuffix }})]
+    protocol = "TCP"
+    ports    = [tostring(local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }})]
   }
 
   allow {
-      protocol = "icmp"
-   }
+    protocol = "icmp"
+  }
 
   source_ranges = [
-      "0.0.0.0/0",
-   ]
+    "0.0.0.0/0",
+  ]
 }
-{{- end }}
 
+output "{{ $computeNetworkResourceName }}" {
+  value = google_compute_network.{{ $computeNetworkResourceName }}.self_link
+}
+
+{{- end }}{{/* range .Data.Regions */}}
+
+output "claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }}" {
+  value = tostring(local.claudie_ssh_port_{{ $specName }}_{{ $uniqueFingerPrint }})
+}

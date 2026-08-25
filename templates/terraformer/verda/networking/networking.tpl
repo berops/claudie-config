@@ -11,8 +11,9 @@
 # Verda does not provide cloud-level firewall or networking resources.
 # Direct iptables rules are used instead of UFW because KubeOne disables UFW
 # during node provisioning. KubeOne does not flush iptables INPUT rules.
-# This template generates the firewall script as a Terraform local
-# so that nodepool/node.tpl can reference it from the verda_startup_script body.
+# This template generates the firewall script as a Terraform local and
+# exports it as an output for the nodepool stage to inject into the
+# verda_startup_script body.
 
 locals {
   claudie_ssh_port_{{ $resourceSuffix }} = 22522
@@ -29,12 +30,12 @@ iptables -A INPUT -p udp --dport 51820 -j ACCEPT
 iptables -A INPUT -p tcp --dport 6443 -j ACCEPT
 # Allow kubelet API
 iptables -A INPUT -p tcp --dport 10250 -j ACCEPT
-{{- end }}
+{{- end }}{{/* if $isKubernetesCluster */}}
 {{- if $isLoadbalancerCluster }}
-  {{- range $role := $LoadBalancerRoles }}
+{{-   range $role := $LoadBalancerRoles }}
 iptables -A INPUT -p {{ lower $role.Protocol }} --dport {{ $role.Port }} -j ACCEPT
-  {{- end }}
-{{- end }}
+{{-   end }}{{/* range $LoadBalancerRoles */}}
+{{- end }}{{/* if $isLoadbalancerCluster */}}
 # Allow ICMP
 iptables -A INPUT -p icmp -j ACCEPT
 # Allow all traffic on WireGuard tunnel interface
@@ -49,4 +50,12 @@ ip6tables -P FORWARD DROP
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq iptables-persistent > /dev/null 2>&1 || true
 iptables-save > /etc/iptables/rules.v4
 FWSCRIPT
+}
+
+output "claudie_ssh_port_{{ $resourceSuffix }}" {
+  value = tostring(local.claudie_ssh_port_{{ $resourceSuffix }})
+}
+
+output "verda_firewall_script_{{ $resourceSuffix }}" {
+  value = local.verda_firewall_script_{{ $resourceSuffix }}
 }
