@@ -210,7 +210,7 @@ resource "azurerm_managed_disk" "{{ $vmDiskResourceName }}" {
   name                 = "{{ $vmDiskName }}"
   location             = "{{ $nodepool.Details.Region }}"
   {{- if $nodepool.Details.Zone }}
-  zone                 = {{ $nodepool.Details.Zone }}
+  zone                 = "{{ $nodepool.Details.Zone }}"
   {{- else }}
   # Zone is only set if the region supports availability zones
   zone                 = length(local.azure_zones_{{ $resourceSuffix }}) > 0 ? element(local.azure_zones_{{ $resourceSuffix }}, parseint(regex("[0-9a-f]+$", "{{ $node.Name }}"), 16)) : null
