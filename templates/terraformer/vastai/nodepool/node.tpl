@@ -20,7 +20,7 @@
 
 # Instances are rented with the team API key when one is configured, otherwise with the personal key.
 # SSH keys are always created with the personal API key.
-# Vast.ai does not support SSH keys on a team accountKeys are held per user, and a key registered
+# Vast.ai does not support SSH keys on a team account. Keys are held per user, and a key registered
 # by a team member applies to the instances rented under that team.
 {{- $account := "personal" }}
 {{- if $nodepool.Details.Provider.GetVastai.GetTeamApiKey }}{{ $account = "team" }}{{ end }}
@@ -30,10 +30,7 @@
 # Vast.ai filters offers by two-letter ISO 3166-1 country codes only. The InputManifest `region`
 # is a space-separated list of such codes, and the aliases below expand a whole continent, so
 # `region: europe` or `region: europe US` both work. Commas are not allowed, the region ends up
-# in a node label. Every ISO country is assigned to exactly one alias. Transcontinental
-# countries follow one side: Russia, Turkey and the Caucasus are in asia, Cyprus, Ukraine and
-# Belarus in europe. Central America, the Caribbean and Greenland are in north-america.
-# Antarctic territories (AQ BV GS HM TF) are left out, nothing is hosted there.
+# in a node label. Every ISO country is assigned to exactly one alias.
 {{- $regions := dict
   "europe"        (list "AD" "AL" "AT" "AX" "BA" "BE" "BG" "BY" "CH" "CY" "CZ" "DE" "DK" "EE" "ES" "FI" "FO" "FR" "GB" "GG" "GI" "GR" "HR" "HU" "IE" "IM" "IS" "IT" "JE" "LI" "LT" "LU" "LV" "MC" "MD" "ME" "MK" "MT" "NL" "NO" "PL" "PT" "RO" "RS" "SE" "SI" "SJ" "SK" "SM" "UA" "VA" "XK")
   "asia"          (list "AE" "AF" "AM" "AZ" "BD" "BH" "BN" "BT" "CN" "GE" "HK" "ID" "IL" "IN" "IO" "IQ" "IR" "JO" "JP" "KG" "KH" "KP" "KR" "KW" "KZ" "LA" "LB" "LK" "MM" "MN" "MO" "MV" "MY" "NP" "OM" "PH" "PK" "PS" "QA" "RU" "SA" "SG" "SY" "TH" "TJ" "TL" "TM" "TR" "TW" "UZ" "VN" "YE")
@@ -53,7 +50,6 @@ resource "vastai_ssh_key" "{{ $sshKeyResourceName }}" {
   provider   = {{ $personalAlias }}
   public_key = file("./{{ $nodepool.Name }}")
 }
-
 
 # Each instance searches the marketplace when it is created and rents the cheapest offer
 # matching its search_offer block. Offers are one machine slot each and vanish once rented,
