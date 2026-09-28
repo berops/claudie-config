@@ -28,11 +28,12 @@
 {{- $personalAlias := printf "vastai.nodepool_%s_personal" $resourceSuffix }}
 
 # Vast.ai filters offers by two-letter ISO 3166-1 country codes only. The InputManifest `region`
-# is a comma-separated list of such codes, and the aliases below expand a whole continent, so
-# `region: europe` or `region: europe,US` both work. Every ISO country is assigned to exactly one
-# alias. Transcontinental countries follow one side: Russia, Turkey and the Caucasus are in asia,
-# Cyprus, Ukraine and Belarus in europe. Central America, the Caribbean and Greenland are in
-# north-america. Antarctic territories (AQ BV GS HM TF) are left out, nothing is hosted there.
+# is a space-separated list of such codes, and the aliases below expand a whole continent, so
+# `region: europe` or `region: europe US` both work. Commas are not allowed, the region ends up
+# in a node label. Every ISO country is assigned to exactly one alias. Transcontinental
+# countries follow one side: Russia, Turkey and the Caucasus are in asia, Cyprus, Ukraine and
+# Belarus in europe. Central America, the Caribbean and Greenland are in north-america.
+# Antarctic territories (AQ BV GS HM TF) are left out, nothing is hosted there.
 {{- $regions := dict
   "europe"        (list "AD" "AL" "AT" "AX" "BA" "BE" "BG" "BY" "CH" "CY" "CZ" "DE" "DK" "EE" "ES" "FI" "FO" "FR" "GB" "GG" "GI" "GR" "HR" "HU" "IE" "IM" "IS" "IT" "JE" "LI" "LT" "LU" "LV" "MC" "MD" "ME" "MK" "MT" "NL" "NO" "PL" "PT" "RO" "RS" "SE" "SI" "SJ" "SK" "SM" "UA" "VA" "XK")
   "asia"          (list "AE" "AF" "AM" "AZ" "BD" "BH" "BN" "BT" "CN" "GE" "HK" "ID" "IL" "IN" "IO" "IQ" "IR" "JO" "JP" "KG" "KH" "KP" "KR" "KW" "KZ" "LA" "LB" "LK" "MM" "MN" "MO" "MV" "MY" "NP" "OM" "PH" "PK" "PS" "QA" "RU" "SA" "SG" "SY" "TH" "TJ" "TL" "TM" "TR" "TW" "UZ" "VN" "YE")
@@ -41,7 +42,7 @@
   "south-america" (list "AR" "BO" "BR" "CL" "CO" "EC" "FK" "GF" "GY" "PE" "PY" "SR" "UY" "VE")
   "oceania"       (list "AS" "AU" "CC" "CK" "CX" "FJ" "FM" "GU" "KI" "MH" "MP" "NC" "NF" "NR" "NU" "NZ" "PF" "PG" "PN" "PW" "SB" "TK" "TO" "TV" "UM" "VU" "WF" "WS") }}
 {{- $geolocations := list }}
-{{- range splitList "," $nodepool.Details.Region }}
+{{- range splitList " " $nodepool.Details.Region }}
   {{- $token := lower (trim .) }}
   {{- if hasKey $regions $token }}{{ $geolocations = concat $geolocations (index $regions $token) }}
   {{- else if $token }}{{ $geolocations = append $geolocations (upper $token) }}{{ end }}
