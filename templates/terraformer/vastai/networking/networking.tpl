@@ -19,7 +19,7 @@ locals {
   claudie_ssh_port_{{ $resourceSuffix }}       = 22522
   claudie_wireguard_port_{{ $resourceSuffix }} = 51820
 
-  # Cloud-init bootstrap shared by every OVH instance in this cluster: enable
+  # Cloud-init bootstrap shared by every VastAi instance in this cluster: enable
   # root SSH from the ubuntu/debian default user and move sshd to the Claudie
   # port via a systemd socket override.
   vastai_bootstrap_script_{{ $resourceSuffix }} = <<-BOOTSCRIPT

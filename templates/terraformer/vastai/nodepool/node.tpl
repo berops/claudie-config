@@ -87,16 +87,24 @@ mkdir -p /opt/claudie/data
 {{- end }}{{/* if $isKubernetesCluster */}}
 EOF
 
+  # both NvidiaGpuCount and NvidiaGpuType are required fields
   search_offer {
     type          = "ondemand"
     verified      = { eq = true }
     reliability   = { gte = 0.98 }
     vms_enabled   = { eq = true }
     static_ip     = { eq = true }
-    num_gpus      = { eq = {{ $nodepool.Details.MachineSpec.NvidiaGpuCount }} }
-    gpu_name      = { eq = "{{ $nodepool.Details.MachineSpec.NvidiaGpuType }}" }
-    gpu_total_ram = { gte = {{ $nodepool.Details.MachineSpec.Memory }} }
-    cpu_cores     = { gte = {{ $nodepool.Details.MachineSpec.CpuCount }} }
+    {{- with $nodepool.Details.MachineSpec }}
+    num_gpus      = { eq = {{ .NvidiaGpuCount }} }
+    gpu_name      = { eq = "{{ .NvidiaGpuType }}" }
+    {{- if .Memory }}
+    gpu_total_ram = { gte = {{ .Memory }} }
+    {{- end }}
+    {{- if .CpuCount }}
+    cpu_cores     = { gte = {{ .CpuCount }} }
+    {{- end }}
+    {{- end }}{{/* with MachineSpec */}}
+    cpu_arch      = { eq = "{{ $nodepool.Details.ServerType }}" }
     disk_space    = { gte = {{ $nodepool.Details.StorageDiskSize }} }
     geolocation   = { in = {{ toJson $geolocations }} }
     duration      = { gte = 2592000 }
