@@ -97,7 +97,11 @@ EOF
     {{- with $nodepool.Details.MachineSpec }}
     num_gpus            = { eq = {{ .NvidiaGpuCount }} }
     gpu_name            = { eq = "{{ .NvidiaGpuType }}" }
-    gpu_ram             = { eq = {{ .Vram }} }
+    # `vram` is given in GB in the InputManifest while Vast.ai expects MB
+    # offers report odd values below the nominal size (e.g. 32607, 48935, 97887 for 32/48/96 GB cards),
+    # so an exact match or a 1024 multiplier would skip valid offers
+    # we multiply by 1000 and use gte instead
+    gpu_ram             = { gte = {{ mul .Vram 1000 }} }
     cpu_cores_effective = { gte = {{ .CpuCount }} }
     cpu_ram             = { gte = {{ .Memory }} }
     {{- end }}{{/* with MachineSpec */}}
