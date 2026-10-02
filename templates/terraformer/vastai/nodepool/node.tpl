@@ -87,30 +87,27 @@ mkdir -p /opt/claudie/data
 {{- end }}{{/* if $isKubernetesCluster */}}
 EOF
 
-  # both NvidiaGpuCount and NvidiaGpuType are required fields
+  # all fields from machineSpec are required
   search_offer {
-    type          = "ondemand"
-    verified      = { eq = true }
-    reliability   = { gte = 0.98 }
-    vms_enabled   = { eq = true }
-    static_ip     = { eq = true }
+    type                = "ondemand"
+    verified            = { eq = true }
+    reliability         = { gte = 0.98 }
+    vms_enabled         = { eq = true }
+    static_ip           = { eq = true }
     {{- with $nodepool.Details.MachineSpec }}
-    num_gpus      = { eq = {{ .NvidiaGpuCount }} }
-    gpu_name      = { eq = "{{ .NvidiaGpuType }}" }
-    {{- if .Memory }}
-    gpu_total_ram = { gte = {{ .Memory }} }
-    {{- end }}
-    {{- if .CpuCount }}
-    cpu_cores     = { gte = {{ .CpuCount }} }
-    {{- end }}
+    num_gpus            = { eq = {{ .NvidiaGpuCount }} }
+    gpu_name            = { eq = "{{ .NvidiaGpuType }}" }
+    gpu_ram             = { eq = {{ .Vram }} }
+    cpu_cores_effective = { gte = {{ .CpuCount }} }
+    cpu_ram             = { gte = {{ .Memory }} }
     {{- end }}{{/* with MachineSpec */}}
-    cpu_arch      = { eq = "{{ $nodepool.Details.ServerType }}" }
-    disk_space    = { gte = {{ $nodepool.Details.StorageDiskSize }} }
-    geolocation   = { in = {{ toJson $geolocations }} }
-    duration      = { gte = 2592000 }
-    inet_down     = { gte = 300 }
-    limit         = {{ add (len $nodepool.Nodes) 5 }}
-    order         = [["dph_total", "asc"]]
+    cpu_arch            = { eq = "{{ $nodepool.Details.ServerType }}" }
+    disk_space          = { gte = {{ $nodepool.Details.StorageDiskSize }} }
+    geolocation         = { in = {{ toJson $geolocations }} }
+    duration            = { gte = 2592000 }
+    inet_down           = { gte = 300 }
+    limit               = {{ add (len $nodepool.Nodes) 5 }}
+    order               = [["dph_total", "asc"]]
   }
 }
 
