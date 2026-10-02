@@ -104,7 +104,7 @@ EOF
     cpu_arch            = { eq = "{{ $nodepool.Details.ServerType }}" }
     disk_space          = { gte = {{ $nodepool.Details.StorageDiskSize }} }
     geolocation         = { in = {{ toJson $geolocations }} }
-    duration            = { gte = 2592000 }
+    duration            = { gte = 604800 }
     inet_down           = { gte = 300 }
     limit               = {{ add (len $nodepool.Nodes) 5 }}
     order               = [["dph_total", "asc"]]
