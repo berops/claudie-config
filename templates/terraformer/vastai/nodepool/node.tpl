@@ -87,30 +87,30 @@ mkdir -p /opt/claudie/data
 {{- end }}{{/* if $isKubernetesCluster */}}
 EOF
 
-  # both NvidiaGpuCount and NvidiaGpuType are required fields
+  # all fields from machineSpec are required
   search_offer {
-    type          = "ondemand"
-    verified      = { eq = true }
-    reliability   = { gte = 0.98 }
-    vms_enabled   = { eq = true }
-    static_ip     = { eq = true }
+    type                = "ondemand"
+    verified            = { eq = true }
+    reliability         = { gte = 0.98 }
+    vms_enabled         = { eq = true }
+    static_ip           = { eq = true }
     {{- with $nodepool.Details.MachineSpec }}
-    num_gpus      = { eq = {{ .NvidiaGpuCount }} }
-    gpu_name      = { eq = "{{ .NvidiaGpuType }}" }
-    {{- if .Memory }}
-    gpu_total_ram = { gte = {{ .Memory }} }
-    {{- end }}
-    {{- if .CpuCount }}
-    cpu_cores     = { gte = {{ .CpuCount }} }
-    {{- end }}
+    num_gpus            = { eq = {{ .NvidiaGpuCount }} }
+    gpu_name            = { eq = "{{ .NvidiaGpuType }}" }
+    # `vram` and `memory` are given in GB in the InputManifest while Vast.ai expects MB
+    # offers report odd values below the nominal size (e.g. 32607, 48935, 97887 for 32/48/96 GB cards),
+    # so an exact match or a 1024 multiplier would skip valid offers, we multiply by 1000 and use gte filter instead
+    gpu_ram             = { gte = {{ mul .Vram 1000 }} }
+    cpu_ram             = { gte = {{ mul .Memory 1000 }} }
+    cpu_cores_effective = { gte = {{ .CpuCount }} }
     {{- end }}{{/* with MachineSpec */}}
-    cpu_arch      = { eq = "{{ $nodepool.Details.ServerType }}" }
-    disk_space    = { gte = {{ $nodepool.Details.StorageDiskSize }} }
-    geolocation   = { in = {{ toJson $geolocations }} }
-    duration      = { gte = 2592000 }
-    inet_down     = { gte = 300 }
-    limit         = {{ add (len $nodepool.Nodes) 5 }}
-    order         = [["dph_total", "asc"]]
+    cpu_arch            = { eq = "{{ $nodepool.Details.ServerType }}" }
+    disk_space          = { gte = {{ $nodepool.Details.StorageDiskSize }} }
+    geolocation         = { in = {{ toJson $geolocations }} }
+    duration            = { gte = 604800 }
+    inet_down           = { gte = 300 }
+    limit               = {{ add (len $nodepool.Nodes) 5 }}
+    order               = [["dph_total", "asc"]]
   }
 }
 
