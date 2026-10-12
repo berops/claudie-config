@@ -15,8 +15,18 @@ locals {
 
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
 
+{{- /* GCP limits resource names to 63 characters. The network and firewall names are
+       '<3-char prefix><clusterHash><fingerprint>-<region>', so the fingerprint is cut to
+       whatever the region leaves. Regions short enough keep the full fingerprint, which
+       keeps names identical to the previous scheme. The fingerprint tells networks of
+       different template versions apart, so refuse to build if too little of it remains. */}}
+{{- $minFingerPrintLen := 8 }}
+{{- $fingerPrintLen    := int (sub 63 (add (len "net") (len $clusterHash) (len "-") (len $region))) }}
+{{- if lt $fingerPrintLen $minFingerPrintLen }}{{ template "networking.tpl: region name too long, the network/firewall name would exceed GCP's 63 character limit" }}{{ end }}
+{{- $shortFingerPrint  := trunc $fingerPrintLen $uniqueFingerPrint }}
+
 {{- $computeNetworkResourceName  := printf "network_%s"   $resourceSuffix }}
-{{- $computeNetworkName          := printf "net%s%s-%s"   $clusterHash $uniqueFingerPrint $region }}
+{{- $computeNetworkName          := printf "net%s%s-%s"   $clusterHash $shortFingerPrint $region }}
 
 resource "google_compute_network" "{{ $computeNetworkResourceName }}" {
   provider                = google.networking_{{ $resourceSuffix }}
@@ -26,7 +36,7 @@ resource "google_compute_network" "{{ $computeNetworkResourceName }}" {
 }
 
 {{- $computeFirewallResourceName     := printf "firewall_%s"  $resourceSuffix }}
-{{- $computeFirewallName             := printf "fwl%s%s-%s"   $clusterHash $uniqueFingerPrint $region }}
+{{- $computeFirewallName             := printf "fwl%s%s-%s"   $clusterHash $shortFingerPrint $region }}
 
 resource "google_compute_firewall" "{{ $computeFirewallResourceName }}" {
   provider     = google.networking_{{ $resourceSuffix }}
