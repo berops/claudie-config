@@ -72,14 +72,10 @@ iptables -A INPUT -p {{ lower $role.Protocol }} --dport {{ $role.Port }} -j ACCE
 iptables -A INPUT -p icmp -j ACCEPT
 # Allow all traffic on WireGuard tunnel interface
 iptables -A INPUT -i wg0 -j ACCEPT
-# Allow traffic from local pods and the Cilium overlay to the host. Pod-to-own-node
-# traffic (e.g. hubble-relay -> cilium-agent :4244, metrics-server -> kubelet :10250)
-# enters via the pod veth (lxc*) or cilium_host, not wg0, and would otherwise hit the
-# default DROP policy below.
+# Allow pod -> host traffic via Cilium interfaces, without these rules
+# the default DROP policy blocks e.g. hubble-relay -> cilium-agent
 iptables -A INPUT -i lxc+ -j ACCEPT
-iptables -A INPUT -i cilium_host -j ACCEPT
-iptables -A INPUT -i cilium_net -j ACCEPT
-iptables -A INPUT -i cilium_vxlan -j ACCEPT
+iptables -A INPUT -i cilium_+ -j ACCEPT
 # Set default policy to drop everything else
 iptables -P INPUT DROP
 # Block IPv6 traffic but allow loopback (kube-apiserver uses [::1]:6443 internally)
