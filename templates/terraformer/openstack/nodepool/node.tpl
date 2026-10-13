@@ -11,12 +11,12 @@
 {{- $specName       := $nodepool.Details.Provider.SpecName }}
 {{- $resourceSuffix := printf "%s_%s_%s" $region $specName $uniqueFingerPrint }}
 {{- $networking     := .Data.Networking.All }}
-{{- $networkId      := index $networking (printf "network_%s_%s" $resourceSuffix $clusterType) }}
-{{- $sgName         := index $networking (printf "claudie_sg_%s" $resourceSuffix) }}
+{{- $networkId      := index $networking (printf "network_%s_%s_%s_%s_%s" $region (sanitizeStringForResourceName $nodepool.Details.ExternalNetworkName) $specName $uniqueFingerPrint $clusterType) }}
+{{- $sgName         := index $networking (printf "claudie_sg_%s_%s_%s_%s" $region (sanitizeStringForResourceName $nodepool.Details.ExternalNetworkName) $specName $uniqueFingerPrint) }}
 {{- $claudieSshPort := index $networking (printf "claudie_ssh_port_%s_%s" $specName $uniqueFingerPrint) }}
 
-{{- if not $networkId }}{{ template "node.tpl: missing output 'network_<region>_<specName>_<fingerprint>_<clusterType>' from the networking stage in .Networking.All" }}{{ end }}
-{{- if not $sgName }}{{ template "node.tpl: missing output 'claudie_sg_<region>_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
+{{- if not $networkId }}{{ template "node.tpl: missing output 'network_<region>_<externalNetwork>_<specName>_<fingerprint>_<clusterType>' from the networking stage in .Networking.All" }}{{ end }}
+{{- if not $sgName }}{{ template "node.tpl: missing output 'claudie_sg_<region>_<externalNetwork>_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
 {{- if not $claudieSshPort }}{{ template "node.tpl: missing output 'claudie_ssh_port_<specName>_<fingerprint>' from the networking stage in .Networking.All" }}{{ end }}
 
 {{- $keypairResourceName := printf "key_%s_%s" $nodepool.Name $resourceSuffix }}
