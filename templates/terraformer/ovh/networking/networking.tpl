@@ -71,6 +71,10 @@ iptables -A INPUT -p {{ lower $role.Protocol }} --dport {{ $role.Port }} -j ACCE
 iptables -A INPUT -p icmp -j ACCEPT
 # Allow all traffic on WireGuard tunnel interface
 iptables -A INPUT -i wg0 -j ACCEPT
+# Allow pod -> host traffic via Cilium interfaces, without these rules
+# the default DROP policy blocks e.g. hubble-relay -> cilium-agent
+iptables -A INPUT -i lxc+ -j ACCEPT
+iptables -A INPUT -i cilium_+ -j ACCEPT
 # Set default policy to drop everything else
 iptables -P INPUT DROP
 # Block IPv6 traffic but allow loopback (kube-apiserver uses [::1]:6443 internally)
