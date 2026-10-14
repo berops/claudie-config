@@ -13,7 +13,7 @@ locals {
 
 {{- range $_, $rn := .Data.RegionNetwork }}
 
-{{- $resourceSuffix := printf "%s_%s_%s" $rn.Region $specName $uniqueFingerPrint }}
+{{- $resourceSuffix := printf "%s_%s_%s_%s" $rn.Region (sanitizeStringForResourceName $rn.ExternalNetwork) $specName $uniqueFingerPrint }}
 
 {{- $privateNetResourceName := printf "network_%s_%s" $resourceSuffix $.Data.ClusterData.ClusterType }}
 
@@ -75,7 +75,7 @@ resource "openstack_networking_router_interface_v2" "{{ $routerIfaecResourceName
 }
 
 {{- $securityGroupResourceName  := printf "claudie_sg_%s"   $resourceSuffix }}
-{{- $securityGroupName          := printf "sg%s%s-%s"       $clusterHash $uniqueFingerPrint $rn.Region }}
+{{- $securityGroupName          := printf "sg%s%s-%s-%s"    $clusterHash $uniqueFingerPrint $rn.Region (sanitizeStringForResourceName $rn.ExternalNetwork) }}
 
 resource "openstack_networking_secgroup_v2" "{{ $securityGroupResourceName }}" {
   provider    = openstack.networking_{{ $resourceSuffix }}
