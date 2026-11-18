@@ -9,6 +9,8 @@ provider "aws" {
   secret_key = file("{{ $specName }}")
   region     = "{{ $region }}"
   alias      = "nodepool_{{ $resourceSuffix }}"
+  # max_retries is the total number of attempts: 1 = no retries. 0 is ignored
+  max_retries = 1
   default_tags {
     tags = {
       Managed-by = "Claudie"
