@@ -101,7 +101,9 @@ resource "verda_instance" "{{ $instanceResourceName }}" {
     size                = {{ $osVolumeSize }}
     type                = "NVMe"
     on_destroy          = "delete_permanently"
+    {{- if $nodepool.Details.Spot }}
     on_spot_discontinue = "delete_permanently"
+    {{- end }}
   }
 }
 
