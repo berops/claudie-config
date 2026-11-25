@@ -18,6 +18,9 @@
 {{- $sshKeyResourceName := printf "key_%s_%s" $nodepool.Name $resourceSuffix }}
 {{- $sshKeyName         := printf "key-%s-%s-%s" $nodepool.Name $clusterHash $specName }}
 
+{{- /* Size in GB of the OS volume Verda creates when none is requested. */}}
+{{- $defaultOsVolumeSize := 50 }}
+
 resource "verda_ssh_key" "{{ $sshKeyResourceName }}" {
   provider   = verda.nodepool_{{ $resourceSuffix }}
   name       = "{{ $sshKeyName }}"
@@ -26,26 +29,11 @@ resource "verda_ssh_key" "{{ $sshKeyResourceName }}" {
 
 {{- range $node := $nodepool.Nodes }}
 
-{{- $instanceResourceName         := printf "%s_%s" $node.Name $resourceSuffix }}
-{{- $startupScriptResourceName    := printf "startup_%s_%s" $node.Name $resourceSuffix }}
-{{- $startupScriptName            := printf "startup-%s-%s" $node.Name $clusterHash }}
-{{- $isWorkerNodeWithDiskAttached := and (not $nodepool.IsControl) (gt $nodepool.Details.StorageDiskSize 0) }}
-{{- $volumeResourceName           := printf "%s_%s_volume" $node.Name $resourceSuffix }}
-{{- $volumeName                   := printf "vol-%s-%s" $node.Name $clusterHash }}
-
-{{- if $isKubernetesCluster }}
-{{-   if $isWorkerNodeWithDiskAttached }}
-
-resource "verda_volume" "{{ $volumeResourceName }}" {
-  provider = verda.nodepool_{{ $resourceSuffix }}
-  name     = "{{ $volumeName }}"
-  size     = {{ $nodepool.Details.StorageDiskSize }}
-  type     = "NVMe"
-  location = "{{ $nodepool.Details.Region }}"
-}
-
-{{-   end }}{{/* if $isWorkerNodeWithDiskAttached */}}
-{{- end }}{{/* if $isKubernetesCluster */}}
+{{- $instanceResourceName      := printf "%s_%s" $node.Name $resourceSuffix }}
+{{- $startupScriptResourceName := printf "startup_%s_%s" $node.Name $resourceSuffix }}
+{{- $startupScriptName         := printf "startup-%s-%s" $node.Name $clusterHash }}
+{{- $osVolumeName              := printf "os-%s-%s" $node.Name $clusterHash }}
+{{- $osVolumeSize              := add $defaultOsVolumeSize $nodepool.Details.StorageDiskSize }}
 
 resource "verda_startup_script" "{{ $startupScriptResourceName }}" {
   provider = verda.nodepool_{{ $resourceSuffix }}
@@ -87,22 +75,6 @@ fi
 
 # Create longhorn volume directory
 mkdir -p /opt/claudie/data
-
-{{-   if $isWorkerNodeWithDiskAttached }}
-
-# Mount attached volume only when not mounted yet
-sleep 50
-disk=$(ls -l /dev/disk/by-id | grep "${verda_volume.{{ $volumeResourceName }}.id}" | awk '{print $NF}')
-disk=$(basename "$disk")
-if [ -n "$disk" ] && ! grep -qs "/dev/$disk" /proc/mounts; then
-  if ! blkid /dev/$disk | grep -q 'TYPE="xfs"'; then
-    mkfs.xfs /dev/$disk
-  fi
-  mount /dev/$disk /opt/claudie/data
-  echo "/dev/$disk /opt/claudie/data xfs defaults 0 0" >> /etc/fstab
-fi
-
-{{-   end }}{{/* if $isWorkerNodeWithDiskAttached */}}
 {{- end }}{{/* if $isKubernetesCluster */}}
 SCRIPT
 }
@@ -121,9 +93,16 @@ resource "verda_instance" "{{ $instanceResourceName }}" {
   is_spot = true
   {{- end }}
 
-  {{- if and $isKubernetesCluster $isWorkerNodeWithDiskAttached }}
-  existing_volumes = [verda_volume.{{ $volumeResourceName }}.id]
-  {{- end }}
+  # Longhorn data lives on the OS volume (default size + storageDiskSize), because a
+  # standalone verda_volume stays in Verda's trash and quota for 96 hours once deleted.
+  # Ref: https://github.com/berops/claudie-config/issues/56
+  os_volume = {
+    name                = "{{ $osVolumeName }}"
+    size                = {{ $osVolumeSize }}
+    type                = "NVMe"
+    on_destroy          = "delete_permanently"
+    on_spot_discontinue = "delete_permanently"
+  }
 }
 
 {{- end }}{{/* range $nodepool.Nodes */}}
