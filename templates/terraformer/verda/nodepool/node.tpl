@@ -105,6 +105,10 @@ resource "verda_instance" "{{ $instanceResourceName }}" {
     on_spot_discontinue = "delete_permanently"
     {{- end }}
   }
+
+  timeouts = {
+    create = "12m"
+  }
 }
 
 {{- end }}{{/* range $nodepool.Nodes */}}
