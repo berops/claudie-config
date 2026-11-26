@@ -19,6 +19,11 @@
 		resource_group_name = data.azurerm_dns_zone.azure_zone_{{ $resourceSuffix }}.resource_group_name
 		ttl                 = 300
 		record              = azurerm_traffic_manager_profile.traffic_manager_{{ $hostname }}_{{ $resourceSuffix }}.fqdn
+
+		timeouts {
+			create = "12m"
+			update = "12m"
+		}
 	}
 
 	output "{{ $clusterID }}_{{ $escapedAlternativeName }}_{{ $resourceSuffix }}" {

@@ -42,6 +42,11 @@ resource "azurerm_traffic_manager_profile" "traffic_manager_{{ $hostname }}_{{ $
     # Claudie creates a default role for loadbalancers which acts as a healthcheck, that is open on port 65534
     port     = 65534
   }
+
+  timeouts {
+    create = "12m"
+    update = "12m"
+  }
 }
 
 {{- range $_, $ip := .Data.RecordData.IP }}
@@ -52,6 +57,11 @@ resource "azurerm_traffic_manager_profile" "traffic_manager_{{ $hostname }}_{{ $
     profile_id           = azurerm_traffic_manager_profile.traffic_manager_{{ $hostname }}_{{ $resourceSuffix}}.id
     weight               = 1
     target               = "{{ $ip.V4 }}"
+
+    timeouts {
+      create = "12m"
+      update = "12m"
+    }
   }
 {{- end }}
 
@@ -62,6 +72,11 @@ resource "azurerm_dns_cname_record" "record_{{ $hostname }}_{{ $resourceSuffix }
   resource_group_name = data.azurerm_dns_zone.azure_zone_{{ $resourceSuffix }}.resource_group_name
   ttl                 = 300
   record              = azurerm_traffic_manager_profile.traffic_manager_{{ $hostname }}_{{ $resourceSuffix}}.fqdn
+
+  timeouts {
+    create = "12m"
+    update = "12m"
+  }
 }
 
 output "{{ $clusterID }}_{{ $resourceSuffix }}" {
