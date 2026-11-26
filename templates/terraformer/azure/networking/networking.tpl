@@ -42,6 +42,11 @@ resource "azurerm_resource_group" "{{ $resourceGroupResourceName }}" {
     managed-by      = "Claudie"
     claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
   }
+
+  timeouts {
+    create = "12m"
+    update = "12m"
+  }
 }
 
 {{- $virtualNetworkResourceName  := printf "claudie_vn_%s"   $resourceSuffix }}
@@ -57,6 +62,11 @@ resource "azurerm_virtual_network" "{{ $virtualNetworkResourceName }}" {
   tags = {
     managed-by      = "Claudie"
     claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
+  }
+
+  timeouts {
+    create = "12m"
+    update = "12m"
   }
 }
 
@@ -140,6 +150,11 @@ resource "azurerm_network_security_group" "{{ $networkSecurityGroupResourceName 
   tags = {
     managed-by      = "Claudie"
     claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
+  }
+
+  timeouts {
+    create = "12m"
+    update = "12m"
   }
 }
 

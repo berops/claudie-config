@@ -46,6 +46,9 @@ resource "hcloud_server" "{{ $serverResourceName }}" {
   public_net {
     ipv6_enabled = false
   }
+  timeouts {
+    create = "12m"
+  }
   ssh_keys = [
     hcloud_ssh_key.{{ $sshKeyResourceName }}.id,
   ]

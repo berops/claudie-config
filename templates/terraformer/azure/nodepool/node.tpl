@@ -78,6 +78,11 @@ resource "azurerm_linux_virtual_machine" "{{ $virtualMachineResourceName }}" {
     claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
   }
 
+  timeouts {
+    create = "12m"
+    update = "12m"
+  }
+
   {{- if $isLoadbalancerCluster }}
   os_disk {
     name                 = "{{ $node.Name }}-osdisk"
@@ -111,6 +116,11 @@ resource "azurerm_virtual_machine_extension" "{{ $virtualMachineExtensionResourc
   tags = {
     managed-by      = "Claudie"
     claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
+  }
+
+  timeouts {
+    create = "12m"
+    update = "12m"
   }
 
   {{- if $isLoadbalancerCluster }}
@@ -224,6 +234,11 @@ resource "azurerm_managed_disk" "{{ $vmDiskResourceName }}" {
     managed-by      = "Claudie"
     claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
   }
+
+  timeouts {
+    create = "12m"
+    update = "12m"
+  }
 }
 
 resource "azurerm_virtual_machine_data_disk_attachment" "{{ $vmDiskAttachmentResourceName }}" {
@@ -232,6 +247,11 @@ resource "azurerm_virtual_machine_data_disk_attachment" "{{ $vmDiskAttachmentRes
   virtual_machine_id = azurerm_linux_virtual_machine.{{ $virtualMachineResourceName }}.id
   lun                = "37"
   caching            = "ReadWrite"
+
+  timeouts {
+    create = "12m"
+    update = "12m"
+  }
 }
 
 {{-   end }}{{/* if $isWorkerNodeWithDiskAttached */}}

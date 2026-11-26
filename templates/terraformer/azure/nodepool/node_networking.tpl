@@ -25,6 +25,11 @@ resource "azurerm_subnet" "{{ $subnetResourceName }}" {
   resource_group_name  = "{{ $rgName }}"
   virtual_network_name = "{{ $vnName }}"
   address_prefixes     = ["{{ $subnetCIDR }}"]
+
+  timeouts {
+    create = "12m"
+    update = "12m"
+  }
 }
 
 {{- $subnetNetworkSecurityGroupAssociationResourceName := printf "%s_%s_associate_nsg" $nodepool.Name $resourceSuffix }}
@@ -33,6 +38,11 @@ resource "azurerm_subnet_network_security_group_association" "{{ $subnetNetworkS
   provider                  = azurerm.nodepool_{{ $resourceSuffix }}
   subnet_id                 = azurerm_subnet.{{ $subnetResourceName }}.id
   network_security_group_id = "{{ $nsgId }}"
+
+  # this resource has no update operation, so only create can be set
+  timeouts {
+    create = "12m"
+  }
 }
 
 {{- range $node := $nodepool.Nodes }}
@@ -51,6 +61,11 @@ resource "azurerm_public_ip" "{{ $publicIPResourceName }}" {
   tags = {
     managed-by      = "Claudie"
     claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
+  }
+
+  timeouts {
+    create = "12m"
+    update = "12m"
   }
 }
 
@@ -75,6 +90,11 @@ resource "azurerm_network_interface" "{{ $networkInterfaceResourceName }}" {
   tags = {
     managed-by      = "Claudie"
     claudie-cluster = "{{ $clusterName }}-{{ $clusterHash }}"
+  }
+
+  timeouts {
+    create = "12m"
+    update = "12m"
   }
 }
 
